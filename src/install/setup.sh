@@ -104,8 +104,7 @@ if [[ "$os_version" == "10" ]]; then
     if ! crontab -l 2>/dev/null | grep -q "Cubotino_P_bash.sh"; then
         (crontab -l 2>/dev/null;\
         echo -e 'MAILTO=""';\
-        echo -e '@reboot su - pi -c "/usr/bin/vncserver :0 -geometry 1280x720\"';\
-        echo -e '#@reboot su - pi -c "/usr/bin/vncserver :0 -geometry 1920x1080"';\
+        echo -e '@reboot su - pi -c "/usr/bin/vncserver :0 -geometry 1920x1080"';\
         echo -e '#@reboot /bin/sleep 5; bash -l /home/pi/cubotino_pocket/src/Cubotino_P_bash.sh > /home/pi/cubotino_pocket/src/Cubotino_P_terminal.log 2>&1')\
         | crontab -
     fi
@@ -136,8 +135,7 @@ elif [[ "$os_version" == "11" ]]; then
     if ! crontab -l 2>/dev/null | grep -q "Cubotino_P_bash.sh"; then
         (crontab -l 2>/dev/null;\
         echo -e 'MAILTO=""';\
-        echo -e '@reboot su - pi -c "/usr/bin/vncserver-virtual :1 -randr=1280x720"';\
-        echo -e '#@reboot su - pi -c "/usr/bin/vncserver-virtual :1 -randr=1920x1080"';\
+        echo -e '@reboot su - pi -c "/usr/bin/vncserver-virtual :1 -randr=1920x1080"';\
         echo -e '#@reboot /bin/sleep 5; bash -l /home/pi/cubotino_pocket/src/Cubotino_P_bash.sh > /home/pi/cubotino_pocket/src/Cubotino_P_terminal.log 2>&1')\
         | crontab -
     fi
