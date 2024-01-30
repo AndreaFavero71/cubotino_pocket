@@ -5,7 +5,7 @@ This repo contains the relevant files for ....
 How to make CUBOTino Pocket: A small, 3D printed, optimal solver for 2x2x2 Rubik's cube
 ![title image](/images/title.jpg)
 
-Further robot info at: https://www.instructables.com/https://www.instructables.com/CUBOTino-Pocket-Optimal-Solver-Robot-for-Rubiks-Cu/
+Further robot info at: https://www.instructables.com/CUBOTino-Pocket-Optimal-Solver-Robot-for-Rubiks-Cu/
 
 An impression of the robot: https://youtu.be/wB4MwINGon0
 
