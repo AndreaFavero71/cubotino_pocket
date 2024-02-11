@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero, 26 January 2024
+# Andrea Favero, 11 February 2024
 #
 # This code relates to CUBOTino Pocket, a very small and simple Rubik's cube solver robot 3D printed.
 # CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -23,19 +23,6 @@
 """
 
 
-from Cubotino_P_pigpiod import pigpiod as pigpiod # start the pigpiod server
-
-
-##################    imports for the display part   ################################
-from Cubotino_P_display import display as s_disp    
-s_disp.set_backlight(0)     # display backlight is set off
-s_disp.show_cubotino()      # show cubotino logo on display, when this script is imported
-s_disp.set_backlight(1)     # activates the display backlight
-# ##################################################################################
-
-
-
-
 
 ##################    imports standard libraries   #################################
 import time                            # import time library
@@ -43,6 +30,7 @@ import RPi.GPIO as GPIO                # import RPi GPIO library
 GPIO.setmode(GPIO.BCM)                 # setting GPIO pins as "Broadcom SOC channel" number, these are the numbers after "GPIO"
 GPIO.setwarnings(False)                # setting GPIO to don't return allarms
 from gpiozero import Servo, PWMLED     # import modules for the PWM part
+from getmac import get_mac_address     # library to get the device MAC ddress
 from get_macs_AF import get_macs_AF    # import the get_macs_AF function
 # ##################################################################################
 
@@ -65,7 +53,6 @@ s_debug=False                   # boolean to print out info when debugging
 flip_to_close_one_step = False  # f_to_close steps (steps from flip up to close) is set false (=2 steps)
 led_init_status = False
 # ##################################################################################
-
 
 
 
@@ -93,14 +80,12 @@ def init_top_cover_led():
 
 
 
-def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
-    """ Function to initialize the robot (servos position) and some global variables, do be called once, at the start.
-        Parameters are imported from a json file, to make easier to list/document/change the variables
+
+def load_servos_parameters(print_out):
+    """ Parameters are imported from a json file, to make easier to list/document/change the variables
         that are expected to vary on each robot.
         These servo_settings are under a function, instead of root, to don't be executed when this script is used from CLI
         with arguments; In this other case the aim is to help setting the servo to their mid position."""
-    
-    from Cubotino_P_update_settings_file import update_srv_settings_file
     
     global t_servo, t_min_pulse_width, t_max_pulse_width, t_top_cover                       # top servo, pulse width, status
     global t_servo_close, t_servo_open, t_servo_read, t_servo_flip, t_servo_rel             # top servo related angles and status
@@ -112,109 +97,78 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
     global b_servo_home, b_servo_stopped, b_servo_CW_pos, b_servo_CCW_pos                   # bottom servo status 
     global b_spin_time, b_rotate_time, b_rel_time                                           # bottom servo timers 
     
-    global flip_to_close_one_step, robot_init_status, fun_status           # robot related
-    global led_init_status, top_cover_led
+    global flip_to_close_one_step
     
     timer = {}
+    from Cubotino_P_update_settings_file import update_srv_settings_file
     
-    if not led_init_status:
-        led_init_status, top_cover_led = init_top_cover_led()
+    # convenient choice for Andrea Favero, to upload the settings fitting his robots, via mac address check
+    import os.path, pathlib, json                # libraries needed for the json, and parameter import
+    
+    macs_AF = get_macs_AF()                      # mac addresses of AF bots are retrieved
+    fname = 'Cubotino_P_servo_settings.txt'      # fname for the text file to retrieve settings
+    folder = pathlib.Path().resolve()            # active folder (should be home/pi/cube)  
+    eth_mac = get_mac_address().lower()          # mac address is retrieved
+    if eth_mac in macs_AF:                       # case the script is running on AF (Andrea Favero) robot
+        pos = macs_AF.index(eth_mac)             # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)         # generates the AF filename
+    else:                                        # case the script is not running on AF (Andrea Favero) robot
+        fname = os.path.join(folder, fname)      # folder and file name for the settings
+    
+    if os.path.exists(fname):                    # case the servo_settings file exists
+        with open(fname, "r") as f:              # servo_settings file is opened in reading mode
+            servo_settings = json.load(f)        # json file is parsed to a local dict variable
+            # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
         
-    if not robot_init_status:                        # case the inititialization status of the servos false
-        if f_to_close_mode:                          # case the init got the f_to_close_mode as true
-            flip_to_close_one_step = True            # flip_to_close_one_step is set true
+        # update key-values parameters, needed in case of additional parameters added at remote repo
+        servo_settings = update_srv_settings_file(fname, servo_settings)   # eventual new servo settings are appended to the older ones
         
-        # convenient choice for Andrea Favero, to upload the settings fitting his robots, via mac address check                
-        from getmac import get_mac_address           # library to get the device MAC ddress
-        import os.path, pathlib, json                # libraries needed for the json, and parameter import
+        if print_out:                            # case print_out variable is set true
+            print('\nImporting servos settings from the text file:', fname)    # feedback is printed to the terminal
+            print('\nImported parameters: ')     # feedback is printed to the terminal
+            for parameter, setting in servo_settings.items():    # iteration over the settings dict
+                print(parameter,': ', setting)   # feedback is printed to the terminal
+            print()
         
-        macs_AF = get_macs_AF()                      # mac addresses of AF bots are retrieved
-        fname = 'Cubotino_P_servo_settings.txt'      # fname for the text file to retrieve settings
-        folder = pathlib.Path().resolve()            # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address().lower()          # mac address is retrieved
-        if eth_mac in macs_AF:                       # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)             # return the mac addreess position in the tupple
-            fname = get_fname_AF(fname, pos)         # generates the AF filename
-        else:                                        # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder, fname)      # folder and file name for the settings
-        
-        if os.path.exists(fname):                    # case the servo_settings file exists
-            with open(fname, "r") as f:              # servo_settings file is opened in reading mode
-                servo_settings = json.load(f)        # json file is parsed to a local dict variable
-                # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
+        backup_fname = os.path.join(folder,'Cubotino_P_servo_settings_backup.txt')     # folder and file name for the settings backup
+        with open(backup_fname, 'w') as f:       # servo_settings_backup file is opened in writing mode
+            if print_out:                        # case print_out variable is set true
+                print('Copy of servos settings parameter is saved as backup at: ', backup_fname)    # feedback is printed to the terminal
             
-            # update key-values parameters, needed in case of additional parameters added at remote repo
-            servo_settings = update_srv_settings_file(fname, servo_settings)   # eventual new servo settings are appended to the older ones
-            
-            if print_out:                            # case print_out variable is set true
-                print('\nImporting servos settings from the text file:', fname)    # feedback is printed to the terminal
-                print('\nImported parameters: ')     # feedback is printed to the terminal
-                for parameter, setting in servo_settings.items():    # iteration over the settings dict
-                    print(parameter,': ', setting)   # feedback is printed to the terminal
-                print()
-            
-            backup_fname = os.path.join(folder,'Cubotino_P_servo_settings_backup.txt')     # folder and file name for the settings backup
-            with open(backup_fname, 'w') as f:       # servo_settings_backup file is opened in writing mode
-                if print_out:                        # case print_out variable is set true
-                    print('Copy of servos settings parameter is saved as backup at: ', backup_fname)    # feedback is printed to the terminal
-                
-                f.write(json.dumps(servo_settings, indent=0))   # content of the setting file is saved in another file, as backup
-                # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
-            
-            try:
-                t_min_pulse_width = float(servo_settings['t_min_pulse_width'])        # defines the min Pulse With the top servo reacts to
-                t_max_pulse_width = float(servo_settings['t_max_pulse_width'])        # defines the max Pulse With the top servo reacts to
-                t_servo_close = float(servo_settings['t_servo_close'])                # Top_cover close position, in gpiozero format
-                t_servo_open = float(servo_settings['t_servo_open'])                  # Top_cover open position, in gpiozero format
-                t_servo_read = float(servo_settings['t_servo_read'])                  # Top_cover camera read position, in gpiozero format
-                t_servo_flip = float(servo_settings['t_servo_flip'])                  # Top_cover flip position, in gpiozero format
-                t_servo_rel_delta = float(servo_settings['t_servo_rel_delta'])        # Top_cover release angle movement from the close position to release tension
-                t_flip_to_close_time = float(servo_settings['t_flip_to_close_time'])  # time for Top_cover from flip to close position
-                t_close_to_flip_time = float(servo_settings['t_close_to_flip_time'])  # time for Top_cover from close to flip position 
-                t_flip_open_time = float(servo_settings['t_flip_open_time'])          # time for Top_cover from open to flip position, and viceversa  
-                t_open_close_time = float(servo_settings['t_open_close_time'])        # time for Top_cover from open to close position, and viceversa
-                t_rel_time = float(servo_settings['t_rel_time'])                      # time for Top_cover to release tension from close position
-
-                b_min_pulse_width = float(servo_settings['b_min_pulse_width'])        # defines the min Pulse With the bottom servo reacts to
-                b_max_pulse_width = float(servo_settings['b_max_pulse_width'])        # defines the max Pulse With the bottom servo reacts to
-                b_servo_CCW = float(servo_settings['b_servo_CCW'])                    # Cube_holder max CCW angle position
-                b_servo_CW = float(servo_settings['b_servo_CW'])                      # Cube_holder max CW angle position
-                b_home = float(servo_settings['b_home'])                              # Cube_holder home angle position
-                b_rel_CCW = float(servo_settings['b_rel_CCW'])                        # Cube_holder release angle from CCW angle positions, to release tension
-                b_rel_CW = float(servo_settings['b_rel_CW'])                          # Cube_holder release angle from CW angle positions, to release tension
-                b_extra_home_CW = float(servo_settings['b_extra_home_CW'])            # Cube_holder release angle from home angle positions, to release tension
-                b_extra_home_CCW = float(servo_settings['b_extra_home_CCW'])          # Cube_holder release angle from home angle positions, to release tension
-                b_spin_time = float(servo_settings['b_spin_time'])                    # time for Cube_holder to spin 90 deg (cune not contrained)
-                b_rotate_time = float(servo_settings['b_rotate_time'])                # time for Cube_holder to rotate 90 deg (cube constrained)
-                b_rel_time = float(servo_settings['b_rel_time'])                      # time for Cube_holder to release tension at home, CCW and CW positions
-                
-                
-
-                
-                
-            except:   # exception will be raised if json keys differs, or parameters cannot be converted to float
-                print('Error on converting to float the imported parameters (at Cubotino_P_servos.py)')   # feedback is printed to the terminal                                  
-                return robot_init_status                                        # return robot_init_status variable, that is False
+            f.write(json.dumps(servo_settings, indent=0))   # content of the setting file is saved in another file, as backup
+            # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
         
-        else:                                                                   # case the servo_settings file does not exists, or name differs
-            print('Could not find Cubotino_P_servo_settings.txt')               # feedback is printed to the terminal                                  
-            return robot_init_status                                            # return robot_init_status variable, that is False
-        
-        if start_pos==0:     # case the servos initial position equals zero (very first setting)
-            t_servo = t_servo_create(t_min_pulse_width, t_max_pulse_width)  # t_servo servo object creation
-            b_servo = b_servo_create(b_min_pulse_width, b_max_pulse_width)  # b_servo servo object creation                 
+        try:
+            t_min_pulse_width = float(servo_settings['t_min_pulse_width'])        # defines the min Pulse With the top servo reacts to
+            t_max_pulse_width = float(servo_settings['t_max_pulse_width'])        # defines the max Pulse With the top servo reacts to
+            t_servo_close = float(servo_settings['t_servo_close'])                # Top_cover close position, in gpiozero format
+            t_servo_open = float(servo_settings['t_servo_open'])                  # Top_cover open position, in gpiozero format
+            t_servo_read = float(servo_settings['t_servo_read'])                  # Top_cover camera read position, in gpiozero format
+            t_servo_flip = float(servo_settings['t_servo_flip'])                  # Top_cover flip position, in gpiozero format
+            t_servo_rel_delta = float(servo_settings['t_servo_rel_delta'])        # Top_cover release angle movement from the close position to release tension
+            t_flip_to_close_time = float(servo_settings['t_flip_to_close_time'])  # time for Top_cover from flip to close position
+            t_close_to_flip_time = float(servo_settings['t_close_to_flip_time'])  # time for Top_cover from close to flip position 
+            t_flip_open_time = float(servo_settings['t_flip_open_time'])          # time for Top_cover from open to flip position, and viceversa  
+            t_open_close_time = float(servo_settings['t_open_close_time'])        # time for Top_cover from open to close position, and viceversa
+            t_rel_time = float(servo_settings['t_rel_time'])                      # time for Top_cover to release tension from close position
 
-        else:                # case the servos initial position differes from zero
-            t_servo = t_servo_create(t_min_pulse_width, t_max_pulse_width, t_servo_open)  # t_servo servo object creation
-            b_servo = b_servo_create(b_min_pulse_width, b_max_pulse_width, b_home)        # b_servo servo object creation
-
-        t_top_cover = start_pos                               # variable to track the top cover/lifter position              
-        b_servo_home=True                                     # boolean of bottom servo at home
-        b_servo_stopped = True                                # boolean of bottom servo at location the lifter can be operated
-        b_servo_CW_pos=False                                  # boolean of bottom servo at full CW position
-        b_servo_CCW_pos=False                                 # boolean of bottom servo at full CCW position
-
-
+            b_min_pulse_width = float(servo_settings['b_min_pulse_width'])        # defines the min Pulse With the bottom servo reacts to
+            b_max_pulse_width = float(servo_settings['b_max_pulse_width'])        # defines the max Pulse With the bottom servo reacts to
+            b_servo_CCW = float(servo_settings['b_servo_CCW'])                    # Cube_holder max CCW angle position
+            b_servo_CW = float(servo_settings['b_servo_CW'])                      # Cube_holder max CW angle position
+            b_home = float(servo_settings['b_home'])                              # Cube_holder home angle position
+            b_rel_CCW = float(servo_settings['b_rel_CCW'])                        # Cube_holder release angle from CCW angle positions, to release tension
+            b_rel_CW = float(servo_settings['b_rel_CW'])                          # Cube_holder release angle from CW angle positions, to release tension
+            b_extra_home_CW = float(servo_settings['b_extra_home_CW'])            # Cube_holder release angle from home angle positions, to release tension
+            b_extra_home_CCW = float(servo_settings['b_extra_home_CCW'])          # Cube_holder release angle from home angle positions, to release tension
+            b_spin_time = float(servo_settings['b_spin_time'])                    # time for Cube_holder to spin 90 deg (cune not contrained)
+            b_rotate_time = float(servo_settings['b_rotate_time'])                # time for Cube_holder to rotate 90 deg (cube constrained)
+            b_rel_time = float(servo_settings['b_rel_time'])                      # time for Cube_holder to release tension at home, CCW and CW positions
+   
+        except:   # exception will be raised if json keys differs, or parameters cannot be converted to float
+            print('Error on converting to float the imported parameters (at Cubotino_P_servos.py)')   # feedback is printed to the terminal                                  
+            return robot_init_status                                              # return robot_init_status variable, that is False
+    
         # bottom servo derived positions
         b_servo_CCW_rel = round(b_servo_CCW + b_rel_CCW,3)    # bottom servo position to rel tensions when fully CW
         b_servo_CW_rel = round(b_servo_CW - b_rel_CW,3)       # bottom servo position to rel tensions when fully CCW
@@ -223,16 +177,6 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         
         # top servo derived position
         t_servo_rel = round(t_servo_close - t_servo_rel_delta,3)     # top servo position to release tension
-
-        robot_init_status = True              # boolean to track the inititialization status of the servos is set true
-        if print_out:                         # case the print_out variable is set true
-            print("\nServo init done")        # feedback is printed to the terminal
-    
-        servo_start_pos(start_pos)            # servos are positioned to the start position    
-        fun_status=False                      # boolean to track the robot fun status, it is True after solving the cube :-)
-        cam_led_test()                        # makes a very short led test
-        cam_led_Off()                         # forces the led off
-        
         
         timer['t_flip_to_close_time'] = t_flip_to_close_time
         timer['t_close_to_flip_time'] = t_close_to_flip_time
@@ -246,7 +190,62 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         timer['b_rotate_time'] = b_rotate_time
         timer['b_rel_time'] = b_rel_time
     
-    return robot_init_status, timer
+    else:                                                                   # case the servo_settings file does not exists, or name differs
+        print('Could not find Cubotino_P_servo_settings.txt')               # feedback is printed to the terminal                                  
+    
+    return timer   # return robot timers
+
+
+
+
+
+
+def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
+    """ Function to initialize the robot (servos position) and some global variables, do be called once, at the start."""
+    
+    global robot_init_status, fun_status, flip_to_close_one_step, led_init_status, top_cover_led
+    
+    set_display()
+    
+    if not led_init_status:                   # case the led_init_status variable is false
+        led_init_status, top_cover_led = init_top_cover_led()  # the GPIO for the led is initialezed
+        
+    if not robot_init_status:                 # case the inititialization status of the servos false
+        
+        from Cubotino_P_pigpiod import pigpiod as pigpiod # start the pigpiod server
+        
+        
+        if f_to_close_mode:                   # case the init got the f_to_close_mode as true
+            flip_to_close_one_step = True     # flip_to_close_one_step is set true
+        
+        timer = load_servos_parameters(print_out)  # upload the servos parameters  
+        if len(timer) == 0:                   # case the return is an empty dict
+            print('Could not find Cubotino_P_servo_settings.txt')  # feedback is printed to the terminal                                  
+            return robot_init_status          # return robot_init_status variable, that is False
+        
+        if start_pos==0:     # case the servos initial position equals zero (very first setting)
+            t_servo = t_servo_create(t_min_pulse_width, t_max_pulse_width)  # t_servo servo object creation
+            b_servo = b_servo_create(b_min_pulse_width, b_max_pulse_width)  # b_servo servo object creation                 
+        else:                # case the servos initial position differes from zero
+            t_servo = t_servo_create(t_min_pulse_width, t_max_pulse_width, t_servo_open)  # t_servo servo object creation
+            b_servo = b_servo_create(b_min_pulse_width, b_max_pulse_width, b_home)        # b_servo servo object creation
+
+        t_top_cover = start_pos               # variable to track the top cover/lifter position              
+        b_servo_home=True                     # boolean of bottom servo at home
+        b_servo_stopped = True                # boolean of bottom servo at location the lifter can be operated
+        b_servo_CW_pos=False                  # boolean of bottom servo at full CW position
+        b_servo_CCW_pos=False                 # boolean of bottom servo at full CCW position
+        
+        robot_init_status = True              # boolean to track the inititialization status of the servos is set true
+        if print_out:                         # case the print_out variable is set true
+            print("\nServo init done")        # feedback is printed to the terminal
+    
+        servo_start_pos(start_pos)            # servos are positioned to the start position    
+        fun_status=False                      # boolean to track the robot fun status, it is True after solving the cube :-)
+        cam_led_test()                        # makes a very short led test
+        cam_led_Off()                         # forces the led off
+        
+    return robot_init_status, timer           # returns the init status and the timer(s) values
 
 
 
@@ -298,6 +297,18 @@ def b_servo_create(b_min_pulse_width, b_max_pulse_width, initial_pos=0):
     return b_servo
 
 
+
+
+
+
+
+def set_display():
+    global s_disp
+    
+    from Cubotino_P_display import display as s_disp    
+    s_disp.set_backlight(0)     # display backlight is set off
+    s_disp.show_cubotino()      # show cubotino logo on display, when this script is imported
+    s_disp.set_backlight(1)     # activates the display backlight
 
 
 
@@ -1575,34 +1586,30 @@ def test_servos_positions():
 
 def test_set_of_movements(slow_time=0):
     """ function to verify the servos while solving a predefined robot movement string:
-        'F2R1S3R1S3S3F1R1F2R1S3S3F1R1S3R1F3R1S3R1S3S3F3R1S3F1R1S3R1F3R1S3R1S3F3R1S3R1
-        F1R3S1F1R3F1S1R3S3F1R1S3R1F3S1R3F1R1S3S3F3R1S3R1F3R1S3R1S3F1S1R3S1F3R3F1R1S3'
+        'F2R1S3R1S3S3F1R1F2R1S3S3F1R1S3R1F3R1S3R1S3S3F3R1S3F1R1S3R1F3R1S3R1S3F3R1S3R1'
         """
     
     global touch_btn, robot_init_status
     
-    # buttons at the display board, used as stop buttons when servos setting/testing via GUI
-    from gpiozero import Button     # library to manage GPIO
- 
-    try:                            # tentative
-        touch_btn                   # name of touch button
-    except NameError:               # case a name error exception is raised
-        touch_btn = Button(26)      # touch button object is created
+    from gpiozero import Button          # library to manage GPIO
+    try:                                 # tentative
+        touch_btn                        # name of touch button
+    except NameError:                    # case a name error exception is raised
+        touch_btn = Button(26)           # touch button object is created
     
-    print('\nDemonstration of the robot servos current settings, by solving a predefined scrambled cube')   
-    print('Press the touch button to interrupt the test')
+    text1 = '\nDemonstration of the robot servos current settings, by solving a predefined scrambled cube'
+    text2 = 'Press the touch button to interrupt the test'
         
     movements= 'F2R1S3R1S3S3F1R1F2R1S3S3F1R1S3R1F3R1S3R1S3S3F3R1S3F1R1S3R1F3R1S3R1S3F3R1S3R1'
-    movements += 'F1R3S1F1R3F1S1R3S3F1R1S3R1F3S1R3F1R1S3S3F3R1S3R1F3R1S3R1S3F1S1R3S1F3R3F1R1S3'
-    # to complete the moves of this string CUBOTino takes 1m:8secs (18/04/2022)
     
-    
-    s_disp.set_backlight(1)              # activates the display backlight
     s_debug= False  # True               # boolean for s_debug printouts purpose
     robot_init_status = False            # False to prevent servos to be positioned as per robot start
 
     if init_servo(print_out=s_debug, start_pos='read'):    # servos are initialized
-        
+        s_disp.set_backlight(1)          # activates the display backlight
+        print(text1)
+        print(text2)
+
         t_ref = time.time()
         screen1=True
         while time.time()-t_ref < 6:
@@ -1628,7 +1635,7 @@ def test_set_of_movements(slow_time=0):
             print(f"Robot has been stopped, after {round(robot_time,1)} secs")  # print the status as feedback
             return 'stopped'                                    # string 'stopped' is returned
 
-#     s_disp.set_backlight(0)                # de-activates the display backlight
+
 
 
 
@@ -1638,8 +1645,7 @@ def test_set_of_movements(slow_time=0):
 
 if __name__ == "__main__":
     """ This main function (without arguments) to test the servos while solving a predefined robot movement string:
-        F2R1S3R1S3S3F1R1F2R1S3S3F1R1S3R1F3R1S3R1S3S3F3R1S3F1R1S3R1F3R1S3R1S3F3R1S3R1
-        F1R3S1F1R3F1S1R3S3F1R1S3R1F3S1R3F1R1S3S3F3R1S3R1F3R1S3R1S3F1S1R3S1F3R3F1R1S3'
+        F2R1S3R1S3S3F1R1F2R1S3S3F1R1S3R1F3R1S3R1S3S3F3R1S3F1R1S3R1F3R1S3R1S3F3R1S3R1'
         
         When argument 'set' from the command line, this function allows to easily set the servos the mid position,
         by passing 0 (zero); Other angles can be tested, by passing values from -1 to 1.
@@ -1669,9 +1675,7 @@ if __name__ == "__main__":
     # #############################################################################################
     
     
-    
-    slow_time=0
-    
+
     #####################  applying the arguments   ###############################################
     if args.fast == True:                # case the Cubotino_P_servo.py has been launched with 'speed' argument
         flip_to_close_one_step = True    # f_to_close steps (steps from flip up to close) is set True (= 1 step)
@@ -1688,12 +1692,12 @@ if __name__ == "__main__":
                 print('\nQuitting Cubotino_P_servos.py\n\n')  # feedback is printed to terminal
                 break                                      # while loop is interrupted
     
-    elif args.tune == True:               # case the Cubotino_P_servo.py has been launched with 'tune' argument
+    if args.tune == True:                 # case the Cubotino_P_servo.py has been launched with 'tune' argument
         import readline                   # library for easier typing at the CLI
         test_servos_positions()           # calls the function to test the individual servos positions
     
-    
-    elif args.slow != None:               # case the Cubotino_P_servo.py has been launched with 'slow' argument
+    slow_time=0
+    if args.slow != None:                 # case the Cubotino_P_servo.py has been launched with 'slow' argument
         slow_time = args.slow             # argument is assigned to the slow_time variable
         slow_time = slow_time/10          # slow_time variabe is converted to seconds
         test_set_of_movements(slow_time=slow_time)  # call to the function that holds the predefined set of movements

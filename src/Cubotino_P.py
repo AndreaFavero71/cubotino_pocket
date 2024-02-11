@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero, 28 January 2024
+#  Andrea Favero, 11 February 2024
 #
 #  This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 #  CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -11,7 +11,7 @@
 #  Demo at https: https://youtu.be/wB4MwINGon0
 #  Instructions: https://www.instructables.com/CUBOTino-Pocket-Optimal-Solver-Robot-for-Rubiks-Cu/
 #
-#  This is the core script, that interracts with few other files.
+#  This is the core script, that interracts with a few other files.
 #  Many functions of this code have been developed on 2021, for my first robot (https://youtu.be/oYRXe4NyJqs).
 #
 #  The cube status is detected via a camera system (PiCamera) and OpenCV .
@@ -21,14 +21,14 @@
 #
 #  Developped on:
 #  - Raspberry Pi Zero2W and Raspberry Pi ZeroW
-#  - Raspberry Pi OS Buster and Bulleys, with security updates and desktop environment
+#  - Raspberry Pi OS Buster and Bulleys, with desktop environment
 #
 #############################################################################################################
 """
 
 
 # __version__ variable
-version = '0.0 (26 Jan 2024)'
+version = '1.0 (11 Feb 2024)'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -48,6 +48,10 @@ parser.add_argument("-f", "--twosteps", action='store_true',
 # --debug argument is added to the parser
 parser.add_argument("-d", "--debug", action='store_true',
                     help="Activates printout of settings, variables and info for debug purpose")
+
+# --no_animation argument is added to the parser
+parser.add_argument("--no_animation", action='store_true',
+                    help="Deactivates the animation on display and screen")
 
 # --cv_wow argument is added to the parser
 parser.add_argument("--cv_wow", action='store_true',
@@ -1055,18 +1059,13 @@ def get_approx_contours(component):
 
 
 
-def get_facelets(facelets, frame, contour, hierarchy, t_ref):
+def get_facelets(facelets, frame, contour, hierarchy):
     """ Contours are analyzed in order to detect the cube's facelets; Argument are simplified contours.
     The function returns contours having square characteristics.
     
     [parameter to be square like: Area within limits, limited egde lenght deviation, limited diagonals lenght deviation
     (to prevent rhonbus), limited area variation between the 4 facelets].
     This function is called on each of the cube sides, therefore the return relates to the face under analysis.""" 
-    
-    if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:   # case the facelets detection takes more than fcs_delay secs
-        facelets, frame = get_facelets_fcs(facelets, frame)   # facelets info are based on fix coordinates
-        fix_c = True                      # fix_c (fix coordinates usage) is set to true   
-        return facelets, frame, fix_c     # list of potential facelet's contour is returned
     
     min_area = int(0.08*(w*h)/4)          # min area limit for a single facelet's contour
     max_area = 6*min_area                 # max area limit for a single facelet's contour
@@ -1114,8 +1113,7 @@ def get_facelets(facelets, frame, contour, hierarchy, t_ref):
                     if frameless_cube.lower != 'false':   # case the cube status reading is for frameless cubes or auto (with and without frames)
                         facelets, frame = estimate_facelets(facelets,frame, w, h)  # calls the function to estimate the remaining facelets                                 
     
-    fix_c = False                   # fix_coordinate approach was not used
-    return facelets, frame, fix_c   # list of potential facelet's contour is returned
+    return facelets, frame      # list of potential facelet's contour is returned
 
 
 
@@ -1503,8 +1501,8 @@ def save_coordinates(coordinates):
     coordinates = np.array(coordinates)                     # the coordinates list is converted to numpy array 
     avg = coordinates.mean(axis=0)                          # coordinates are averaged by 'columns'
     avg = np.round(avg, decimals=0).astype(int)             # coordinates are first rounded to 0 decimal then converted to integers
-    avg = str(list(avg)).replace('[','').replace(']','')+'\n'  # coordinates are converted to list, then to string without parentheses
-    
+    avg = str(list(avg))                                    # coordinates are converted from array to list to string
+    avg = avg.replace('[','').replace(']','').replace(' ','')+'\n'  # coordinates string without parentheses and empty spaces
     fname = 'Cubotino_P_coordinates.txt'                    # fname for the text file to retrieve the coordinates
     folder = pathlib.Path().resolve()                       # active folder (should be home/pi/cubotino_pocket/src)
     fname = os.path.join(folder, fname)                     # folder and file name for the coordinates, to be saved
@@ -1530,9 +1528,11 @@ def load_coordinates():
     if os.path.exists(fname):                               # case the coordinates file exists
         with open(fname, "r") as f:                         # settings file is opened in reading mode
             lines = f.readlines()                           # all lines are assigned as list to lines variable
+        if len(lines)>=1:                                   # case the file has at least one row of data
+            historical_data = True                          # flag to track presence or assence of historical data is set True
     else:                                                   # case the coordinates file does not exist
         print(f"Not found file {fname}")                    # print feedback to the terminal
-        print("This files is generated by the robot at the first successfull cycles") # print feedback to the terminal
+        print("This files is generated by the robot at the first successfull cycle") # print feedback to the terminal
 
     corrupted_data = False                                  # corrupted_data is initially set False
     if len(lines)>=1:                                       # case the file has at least one row of data
@@ -1561,15 +1561,14 @@ def load_coordinates():
                     if keep_line:                           # case keep_line variable is (still) True
                         f.write(line)                       # that line is written to text file
                         new_lines.append(line)              # line is appended to lines
-        if debug:                                           # case debug is set true
-            print(f"The file got repaired")                 # feedback is printed to the terminal
-        lines = new_lines                                   # new_lines is assigned to lines
-    
-    if len(lines)>=1:                                       # case the file has at least one row of data
-        historical_data = True                              # flag to track presence or assence of historical data is set True
-    
-    if debug:                                               # case debug is set true
-        print("Loaded facelets coordinates")                # feedback is printed to the terminal
+        
+        if len(new_lines)>=1:                               # case the file has at least one row of data
+            lines = new_lines                               # new_lines is assigned to lines
+            if debug:                                       # case debug is set true
+                print(f"The file got repaired")             # feedback is printed to the terminal
+        else:                                               # case the remaining file does not have any row of data
+            lines=[]                                        # lines variable is set as an empty list
+            historical_data = False                         # historical data variable is set False
         
     if historical_data:                                     # case there is historical data
         # convert from string to integers and feed a list with coordinates values as tuple
@@ -1595,9 +1594,15 @@ def load_coordinates():
         avg = all_coordinates.mean(axis=0)                  # coordinates are averaged by 'columns'
         avg = np.round(avg, decimals=0).astype(int)         # coordinates are first rounded to 0 decimal then converted to integers
         avg = avg.tolist()                                  # coordinates are assigned to a list
+        if debug:                                           # case debug is set true
+            print("Loaded facelets coordinates:", avg)      # feedback is printed to the terminal
         return avg                                          # the average coordinates are returned
+    
     else:                                                   # case there isn't historical data
+        if debug:                                           # case debug is set true
+            print("Not loaded facelets coordinates")        # feedback is printed to the terminal
         return []                                           # an empty list is returned 
+
 
 
 
@@ -2063,50 +2068,47 @@ def cube_solution(cube_string, scrambling=False):
     More solutions could be returned, having the same quantity of cube movements; In this case
     it is chosen the faster solution for the robot."""
     
-    s=''
-    solution_Text=''
-    robot_moves=''
-    total_robot_moves=''
-    est_time=0
+    disp.show_on_display('SOLUTION', 'SEARCH', fs1=21, fs2=27)   # feedback is plot to display
+    
+    solution_Text = ''                          # empty string variable to store the eventual erro messages from Kociemba solver
+    robot_moves = ''                            # empty string variable to store the ronbot moves
+    total_robot_moves = 0                       # totatl robot moves is initialize to zero
+    est_time = 0                                # estimated servos time is initialized to zero
     
     solutions = sv.solve(cube_string)           # solver is called
     solutions = solutions.splitlines()          # solver return is plit by lines
+    solutions = [ x.replace(" ","") for x in solutions]  # empty spaces are removed
+    
+    # case the scrambling is set True or the solver returned a single and short solution
+    # len(solution[0]<=0 means a URF face rotation, no optimizations possible
+    if scrambling or (len(solutions)==1 and len(solutions[0])<=6):
+        single_solution = True                  # singles_olution is set True
+    else:                                       # caase for multiple solutions, or single solutions with two or more moves
+        single_solution = False                 # single_solution is set False
 
-    
-    if scrambling or (not scrambling and len(solutions)==1):  # case scrambling is set True or 1 solution
-        s = solutions[0]                        # the first solution is taken
-        
+    if not single_solution:                     # case not scrambling (and expected multiple solutions)
         if debug:                               # case debug variable is set True
-            print(f"\nReturned solution from the solver: {s}")  # feedback is printed to the terminal
+            print(f"\nReturned {len(solutions)} solutions from the solver:")  # feedback is printed to the terminal
+            print(solutions, '\n')              # feedback is printed to the terminal
+                                                
+        ######################################################################################
+        # generating alternative solutions, by also using the D L B faces rotation
+        s = solutions.copy()                    # solutions list is copied to a shorter variable name
+        for solution in s:                      # iteration over the solutions returned by the Kociemba solver
+            sols = rm.alt_solutions(solution)   # alternative solutions are generated
+            for sol in sols:                    # iteration over the alternative solutions generated
+                solutions.append(sol)           # alternative solutions are appended to the original kociemba solutions
+        solutions = list(set(solutions))        # duplicated solutions are removed (at the cost of loosing the original order)
+
+        if debug:                               # case debug variable is set True
+            print(f"\nTotal solutions (solver + robot alternatives) are: {len(solutions)}")  # feedback is printed to the terminal
+            print(solutions, '\n')              # feedback is printed to the terminal
+        # ###################################################################################
         
-        s = s[:s.find('(')]                     # solution capture the sequence of manoeuvres
-        solution_Text = s[s.find('(')+1:s.find(')')-1]+' moves  '+ s[:s.find('(')]  # manipulated string, used in Cubotino
-        
-        if s[:5] =='Error':                     # case solution error (incoherent cube string sent to the solver)
-            solution_Text = 'Error'             # 'Error' string is assigned to solution_Text variable
-        
-        if solution_Text != 'Error':            # case the solver does not returns errors
-            # string with robot movements, and total movements
-            _, robot_moves, total_robot_moves, _ = rm.robot_required_moves(s, solution_Text, simulation=False, informative=debug)
-            est_time = servo.estimate_time(robot_moves, timer, slow_time_s)  # estimation servos time for the single solution
-    
-    if not scrambling:                          # case scrambling is set False
-        disp.show_on_display('SOLUTION', 'SEARCH', fs1=21, fs2=27)   # feedback is plot to display
-    
         solution = {}                           # empty dict to store the solver solution(s)
-        
         for i, sol in enumerate(solutions):     # iteration over the returned solutions
             solution[i] = sol[:sol.find('(')]   # solution capture the sequence of manoeuvres
             
-        if debug:                               # case debug variable is set True
-            if len(solution) <= 1:              # case the solver returned a single solution
-                print(f"\nReturned solution from the solver: {solution[0]}")  # feedback is printed to the terminal
-            else:                               # case the solver returned multiple solutions
-                print()                         # print an empty line
-                print(f"Returned {len(solution)} solutions from the solver:")  # feedback is printed to the terminal
-                print(solution)                 # feedback is printed to the terminal
-            print()                             # print an empty line
-        
         # selecting the solution with lower robot movements
         if len(solution)>1:                     # case there are multiple solutions
             estimate_time = {}                  # dict to store the solving time taken by the servos
@@ -2115,6 +2117,8 @@ def cube_solution(cube_string, scrambling=False):
             for i, sol in solution.items():     # iteration over the solver solutions
                 if debug:                       # case debug variable is set True
                     print(f"\nAnalysing solution {i}: {sol}")  # feedback is printed to Terminal
+                    if 'D' in sol or 'B' in sol or 'L'in sol:  # case characters DBL are in sol
+                        print("Applied DBL faces rotation")    # feedback is printed to Terminal
                 solution_Text = ''              # an empty text is assigned to solution_Text variable
                 # string with robot movements, for 'i' solution
                 _, robot_moves, total_moves, _ = rm.robot_required_moves(sol, solution_Text, simulation=False, informative=debug)
@@ -2123,7 +2127,7 @@ def cube_solution(cube_string, scrambling=False):
                 tot_robot_moves[i] = total_moves   # total quantity of robot movements for the robot moves in argument
             
             best_solution = min(estimate_time, key=estimate_time.get)  # dict index for the fastest solution
-            s = solution[best_solution]          # string of the fastest solver solution 
+            s = solution[best_solution]        # string of the fastest solver solution 
             est_time = estimate_time[best_solution]   # estimation servos time of the fastest solution
             robot_moves = robot_moves_strings[best_solution]   # robot movements for the fastest solution
             total_robot_moves = tot_robot_moves[best_solution]   # total quantity of robot movements for the fastest solution
@@ -2137,7 +2141,22 @@ def cube_solution(cube_string, scrambling=False):
                 print("List of estimated servos time:", estimate_time)   # feedback is printed to Terminal
                 print("Selected solution:", s)  # feedback is printed to Terminal
                 print("Selected robot moves:", robot_moves)  # feedback is printed to Terminal
-
+        
+       
+    elif single_solution:                       # case for scrambling or single very short solutions
+        s = solutions[0]                        # the first and only solution is taken from the list
+        if debug:                               # case debug variable is set True
+            print(f"\nReturned solution from the solver: {s}")  # feedback is printed to the terminal
+        s = s[:s.find('(')]                     # solution capture the sequence of manoeuvres
+        solution_Text = s[s.find('(')+1:s.find(')')-1]+' moves  '+ s[:s.find('(')]  # manipulated string, used in Cubotino
+        if s[:5] =='Error':                     # case solution error (incoherent cube string sent to the solver)
+            solution_Text = 'Error'             # 'Error' string is assigned to solution_Text variable
+        
+        if solution_Text != 'Error':            # case the solver does not returns errors
+            # string with robot movements, and total movements
+            _, robot_moves, total_robot_moves, _ = rm.robot_required_moves(s, solution_Text, simulation=False, informative=debug)
+            est_time = servo.estimate_time(robot_moves, timer, slow_time_s)  # estimation servos time for the single solution
+                
     if debug and solution_Text != 'Error':      # case debug variable is set True
         print("Estimated time for the servos:", est_time, "secs")  # feedback is printed to Terminal
     
@@ -2286,7 +2305,7 @@ def cube_sketch_coordinates(x_start, y_start, d):
                 if j == 1: y = y+d                         # once at the second column the row is incremented
     square_dict = {k:tuple(square_start_pt[k]) for k in range(len(square_start_pt))}  # dictionary is made with tuples of top-left coordinates
     
-    return square_start_pt, square_dict
+    return square_start_pt, square_dict   # returns a list and a dict with the the facelets top left square coordinates
 
 
 
@@ -2737,6 +2756,9 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_stat
         # movements to the robot are finally applied
         solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
         
+        
+        animation(screen, ref_colors_BGR, cube_status_string, robot_moves)    # plot on screen the facelets animation 
+        
         # some relevant info are logged into a text file
         log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner,
                  tot_robot_time, start_time, camera_ready_time, cube_detect_time, cube_solution_time,
@@ -2746,7 +2768,7 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_stat
         deco_info = (fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, \
                      cube_status_string, URFDLB_facelets_BGR_mean, \
                      color_detection_winner, show_time, timestamp) # tuple of variables needed for the decoration function
-        decoration(deco_info)  # cals the decoration function, that shows (or just saves, is screen=False) cube's faces pictures  
+        decoration(deco_info)      # cals the decoration function, that shows (or just saves, is screen=False) cube's faces pictures  
         
     else:                          # case there is a request to stop the robot
         tot_time_sec = 0           # robot solution time is forced to zero when the solving is interrupted by the stop button
@@ -3729,6 +3751,157 @@ def tune_image_setup(expo_shift, display, gui_debug):
 
 
 
+def cube_facelets_permutation(cube_status, move_type, direction):
+    """Function that updates the cube status, according to the move type the robot does.
+       The 'ref' tuples provide the current facelet reference position to be used on the updated position.
+       As example, in case of flip, the resulting facelet 0 is the one currently in position 23 (ref[0]).
+       The initial cube orientation is not the one the robos has after the scanning process."""
+    
+    if move_type == 'F':         # case the robot move is a cube flip (complete cube rotation around L-R horizontal axis) 
+        ref = (23,22,21,20,5,7,4,6,0,1,2,3,8,9,10,11,18,16,19,17,15,14,13,12) # facelet number corresponding to its index
+    
+    elif move_type == 'S':       # case the robot move is a spin (complete cube rotation around vertical axis)
+        if direction == '1':     # case spin is CW
+            ref = (1,3,0,2,8,9,10,11,16,17,18,19,14,12,15,13,20,21,22,23,4,5,6,7) # facelet number corresponding to its index
+        elif direction == '3':   # case spin is CCW
+            ref = (2,0,3,1,20,21,22,23,4,5,6,7,13,15,12,14,8,9,10,11,16,17,18,19) # facelet number corresponding to its index
+    
+    elif move_type == 'R':       # case the robot move is a rotation (lowest layer rotation versus mid and top ones) 
+        if direction == '1':     # case 1st layer rotation is CW
+            ref = (0,1,2,3,4,5,10,11,8,9,18,19,14,12,15,13,16,17,22,23,20,21,6,7) # facelet number corresponding to its index
+        elif direction == '3':   # case 1st layer rotation is CCW
+            ref = (0,1,2,3,4,5,22,23,8,9,6,7,13,15,12,14,16,17,10,11,20,21,18,19) # facelet number corresponding to its index
+    
+    new_status = ""              # empty string to generate the cube status, updated according to move_type and direction
+    for i in range(24):          # iteration over the 24 facelets
+        new_status+=str(cube_status[ref[i]])  # updated cube status takes the facelet from previous status at ref location
+    
+    return new_status            # updated cube status is returned
+
+
+
+
+
+
+
+def plot_animation(wait, ref_colors_BGR, cube_status, startup=False, kill=False):
+    """ Based on the detected cube status, a sketch of the cube is plot with bright colors on the pictures collage."""
+
+    if startup:
+        global plot_colors_a, sketch_a, frame_a, start_points_a, inner_points_a, x_start_a, y_start_a, d_a
+        
+        # BGR colors for the facelets plot
+        plot_colors_a = {'U':(ref_colors_BGR[0]), 'R':(ref_colors_BGR[1]), 'F':(ref_colors_BGR[2]),
+                         'D':(ref_colors_BGR[3]), 'L':(ref_colors_BGR[4]), 'B':(ref_colors_BGR[5])}
+        
+        # BGR colors for the facelets plot
+#         plot_colors_a = {'U':(255, 255, 255), 'R':(29, 32, 185), 'F':(35, 144, 0),
+#                          'D':(50, 255, 255), 'L':(0, 128, 255), 'B':(100, 65, 0)}
+        
+        sketch_a = np.zeros([350, 450, 3],dtype=np.uint8) # empty array
+        sketch_a.fill(230)                          # array is filled with light gray
+        x_start_a = 20                              # x coordinate origin for the sketch
+        y_start_a = 20                              # y coordinate origin for the sketch
+        d_a = 50                                    # edge lenght for each facelet reppresentation
+        
+        _, facelets_start_a = cube_sketch_coordinates(x_start_a, y_start_a, d_a)  # dict with the top-left coordinates for each of the 24 facelets
+        
+        inner_points_a = []                         # empty list to store the inner points (coordinates) to be later colored
+        for i in range(24):                         # iteration over the 24 facelets
+            inner_points_a.append(inner_square_points(facelets_start_a,i,d_a)) # array with the 4 square inner vertex coordinates
+        inner_points_a = tuple(inner_points_a)      # list is converted to tuple
+
+        for i in range(24):                         # iteration over the 24 facelets interpreted colors
+            cv2.rectangle(sketch_a,
+                          tuple(facelets_start_a[i]),
+                          (facelets_start_a[i][0]+d_a, facelets_start_a[i][1]+d_a),
+                          (0,0,0), 1)               # square black frame are plot to define the cube sketch
+            
+        cv2.namedWindow('animation')                # create the cube window
+        cv2.moveWindow('animation', 0,0)            # move the window to (0,0)
+        for i in range(5):                          # iteration for 5 times (to refresh the new window on screen)
+            cv2.imshow("animation", sketch_a)       # sketch is plot to screen
+            cv2.waitKey(10)                         # refresh time is limited
+
+    for i, color in enumerate(cube_status):         # iteration over the 24 facelets interpreted colors
+        B,G,R = plot_colors_a[color]                # BGR values of the assigned colors for the corresponding detected color
+        cv2.fillPoly(sketch_a, pts = [inner_points_a[i]], color=(B,G,R))  # inner square is colored with bright color    
+    
+    cv2.imshow("animation", sketch_a)               # sketch_a is plot to screen
+    cv2.waitKey(wait)                               # refresh time
+    
+    if kill:                                        # case kill variable is set True
+        cv2.destroyAllWindows()                     # all the windows are closed
+
+
+
+
+
+
+
+def animation(screen, ref_colors_BGR, cube_status_string, robot_moves):
+    """Plots to screen the facelets animation on a cube sketch.
+        Detected colors are used to identify the different facelets."""
+    
+    cube_status_a = cube_status_string              # cube_status_string is assigned to a local and shorter variable
+    
+    # changing the URF oriented cube status to the cube orientation after the scanning 
+    cube_status_a = cube_facelets_permutation(cube_status_a, 'S', '3')  # facelets permutation assigned to updated cube_status_a
+    cube_status_a = cube_facelets_permutation(cube_status_a, 'F', '1')  # facelets permutation assigned to updated cube_status_a
+    
+    idx = 1                                         # idx variale used for the dict key
+    csa = {}                                        # dict to store the cube status from the start until solution
+    csa[0] = cube_status_a                          # first csa value is the cube status after scanning
+    for i in range(0, len(robot_moves),2):          # iteration over the "in-between" robot movements
+        move_type = robot_moves[i:i+1]              # robot move type is retrieved from robot_moves string
+        direction = robot_moves[i+1:i+2]            # robot move direction/repeats is retrieved from robot_moves string
+        if move_type == 'F':                        # case the robot move is F (flip)
+            for k in range(int(direction)):         # iteration over the quantity of flips
+                # facelets permutation assigned to pdated cube_status_a
+                cube_status_a = cube_facelets_permutation(cube_status_a, move_type, direction)
+                csa[idx] = cube_status_a            # csa gets cube_status_a as new value for the idx index
+                idx+=1                              # idx index is incremented
+        else:                                       # case the robot move is not F (not flip means spin or rotate)
+            # facelets permutation assigned to pdated cube_status_a
+            cube_status_a = cube_facelets_permutation(cube_status_a, move_type, direction)
+            csa[idx] = cube_status_a                # csa gets cube_status_a as new value for the idx index
+            idx+=1                                  # idx index is incremented
+        
+    frames = len(csa)                               # len(csa) defines the frames quantity
+    
+    animation_activated = True                      # animation_activated is set True
+    
+    if animation_activated:                         # case animation_activated is set True
+        for i in range(frames):                     # iteration over the frames quantity
+            if i == 0:                              # case of the first frame
+                disp.plot_status(csa[i], ref_colors_BGR, startup=True)  # csa is plot to display, after setting the display up
+                time.sleep(2)                       # sleep time to let visible the cube status on display
+            else:                                   # case from the 2nd to the last frames
+                disp.plot_status(csa[i], ref_colors_BGR)  # csa is plot to display
+                time.sleep(0.5)                     # (smaller) sleep time to let visible the cube status on display
+        time.sleep(3)                               # additional sleep time at the end
+    
+    if screen:                                      # case screen variable is set True
+        t1 = 3000                                   # t1 in ms (plot time for initial and final cube status on the sketch)
+        t2 = 500                                    # t2 in ms(plot time for cube status while moving the cube)
+        for i in range(frames):                     # iteration over the frames quantity
+            if i == 0:                              # case of the first frame
+                show_ms = t1                        # sketch showing time as per t1
+                plot_animation(show_ms, ref_colors_BGR, csa[i], startup=True)  # initial cube status is plot to the screen
+            elif i< frames-1:                       # case from the 2nd to the last but frames
+                show_ms = t2                        # sketch showing time as per t1
+                plot_animation(show_ms, ref_colors_BGR, csa[i])  # initial cube status is plot to the screen
+            else:                                   # case for the last frames
+                show_ms = t1                        # sketch showing time as per t1
+                # the final cube status is plot to the screen, with kill instruction
+                plot_animation(show_ms, ref_colors_BGR, csa[i], kill=True)
+
+
+
+
+
+
+
 def start_up(first_cycle=False, set_cropping=False):
     """ Start up function, that aims to run (once) all the initial settings needed."""
     
@@ -3866,10 +4039,13 @@ def cubeAF():
                     cv2.imshow('cube', frame)                          # shows the frame 
                     cv2.waitKey(1)      # refresh time is minimized to 1ms, refresh time mostly depending to all other functions
                 
+                if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:   # case the facelets detection takes more than fcs_delay secs
+                    facelets, frame = get_facelets_fcs(facelets, frame)   # facelets info are based on fix coordinates
+                    fix_c += 1                                         # fcs (Fix Coordinates System) is incremented
+                
                 if corners==4:                                         # contours with 4 corners are of interest
-                    facelets, frame, fix_c = get_facelets(facelets, frame, contour, hierarchy, t_ref) # returns a dict with cube compatible contours
-                    fcs += fix_c                                       # fcs (Fix Coordinates System) is incremented
-
+                    facelets, frame = get_facelets(facelets, frame, contour, hierarchy) # returns a dict with cube compatible contours
+                
                 if len(facelets)==4:                                   # case there are 4 contours having facelets compatible characteristics
                     facelets = order_4contours(facelets, new_center=[])  # contours are ordered from top left
                     d_to_exclude = distance_deviation(facelets)        # facelets to remove due inter-distance not as regular 3x3 array
@@ -3920,7 +4096,6 @@ def cubeAF():
                             except:                              # in case of exceptions
                                 pass                             # do nothing
                         
-                        
                         ref_colors_BGR = cube_colors_clusters(URFDLB_facelets_BGR_mean)  # six reference colors out of the 24 facelets
                         cube_status = cube_colors_interpr(URFDLB_facelets_BGR_mean, ref_colors_BGR) # cube string status
                         
@@ -3932,6 +4107,10 @@ def cubeAF():
                             color_detection_winner = 'BGR'       # variable used to log which method gave the solution
                             cube_solution_time = time.time()     # time stored after getting the cube solution
                             print(f'\nCube status : {cube_status_string}')   # feedback is printed to the terminal
+                            if 'B'in solution or 'D' in solution or 'L' in solution:  # case of a DBL solution
+                                print(f'Selected (optimized) solution : {solution}')   # feedback is printed to the terminal
+                            else:                                # case of URF solution
+                                print(f'Selected solution : {solution}')   # feedback is printed to the terminal
                             print(f'Camera warm-up, camera setting, cube status (BGR), and solution, in: {round(time.time()-start_time,1)} secs')         
 
                             if solution_Text == 'Error':         # case  colors interpretation via BGR color distance fails
@@ -3946,9 +4125,6 @@ def cubeAF():
                             color_detection_winner = 'Error'
                             cube_status_string = cube_string(cube_status)
                             cube_solution_time = time.time()     # time
-                        
-                        if fcs == 0:   # (fcs = fix coordinates system) case the all facelets were detected without the fix coordinates method
-                            save_coordinates(all_coordinates)    # saves the coordinates of the 4 facelets found during scanning
 
                         robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, 
                                          URFDLB_facelets_BGR_mean, font, fontScale, lineType, show_time,
@@ -3957,9 +4133,12 @@ def cubeAF():
                                          start_time, camera_ready_time, cube_detect_time, cube_solution_time,
                                          slow_time_s, os_version, fcs)
                         
+                        if fcs == 0:   # (fcs = fix coordinates system) case the all facelets were detected without the fix coordinates method
+                            save_coordinates(all_coordinates)    # saves the coordinates of the 4 facelets found during scanning
+
                         return                       # closes the cube reading/solver function in case it reaches the end
                 
-                
+    
                 # case there are less than 4 contours detected, yet shown on screen as feedback
                 if screen and not robot_stop:        # case screen variable is set True
                     cv2.imshow('cube', frame)        # shows the frame 
@@ -4008,6 +4187,11 @@ if __name__ == "__main__":
     screen = True           # flag to enable/disable commands requiring a screen connection, for graphical print out
     fixWindPos = True       # flag to fix the CV2 windows position, starting from coordinate 0,0 (top left)
     
+    animation_activated = True    # flag to enable/disable the cube_status animation on screen is set True
+    if args.no_animation != None: # case 'no_animation' argument exists
+        if args.no_animation:     # case the Cubotino_P.py has been launched with 'no_animation' argument
+            animation_activated = False   # flag to enable/disable the cube_status animation on screen is set False
+ 
     cv_wow = False          # flag to enable/disable the visualization of the image analysis used to find the facelets
     if args.cv_wow != None: # case 'cv_wow' argument exists
         if args.cv_wow:     # case the Cubotino_P.py has been launched with 'cv_wow' argument

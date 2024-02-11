@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 26 January 2024
+#  Andrea Favero 11 February 2024
 #
 # This script relates to CUBOTino Pocket, a small and simple solver robot for a 2x2x2 Rubik's cube
 # This specific script manages the display, and it's imported by Cubotino_P.py and Cubotino_P_servos.py
@@ -204,6 +204,63 @@ class Display:
         
         self.disp.display(disp_img) # image is plotted to the display
 
+        
+        
+
+    
+    
+    def plot_status(self, cube_status, ref_colors_BGR={}, startup=False):
+        """ Function to print the cube sketch of the cube colors."""
+        
+        if startup:
+            self.c = {'U':(ref_colors_BGR[0]), 'R':(ref_colors_BGR[1]), 'F':(ref_colors_BGR[2]),
+                      'D':(ref_colors_BGR[3]), 'L':(ref_colors_BGR[4]), 'B':(ref_colors_BGR[5])}
+
+            x_start = 4                                    # x coordinate for face top-left corner
+            y_start = 7                                    # y coordinate for face top-left corner
+            self.d = 19                                    # facelet square side
+            self.g = 2                                     # offset for xy origin-square of colored facelet
+            self.gg = 2*self.g                             # offset for xy end-square of colored facelet
+            
+            # dict with the top-left coordinate of each face (not facelets !)
+            starts={0:(x_start+2*self.d, y_start),
+                    1:(x_start+4*self.d, y_start+2*self.d),
+                    2:(x_start+2*self.d, y_start+2*self.d),
+                    3:(x_start+2*self.d, y_start+4*self.d),
+                    4:(x_start,          y_start+2*self.d),
+                    5:(x_start+6*self.d, y_start+2*self.d)}
+            
+            # coordinate origin for the 24 facelets
+            tlc=[]                                         # list of all the top-left vertex coordinate for the 24 facelets
+            for value in starts.values():                  # iteration over the 6 faces
+                x_start=value[0]                           # x coordinate fo the face top left corner
+                y_start=value[1]                           # y coordinate fo the face top left corner
+                y = y_start                                # y coordinate value for the first 3 facelets
+                for i in range(2):                         # iteration over rows
+                    x = x_start                            # x coordinate value for the first facelet
+                    for j in range(2):                     # iteration over columns
+                        tlc.append((x, y))                 # x and y coordinate, as list, for the top left vertex of the facelet is appendended
+                        x = x+self.d                       # x coordinate is increased by square side
+                        if j == 1: y = y+self.d            # once at the second column the row is incremented
+            self.tlc = tuple(tlc)                          # tlc list is converted to tuple
+            
+            self.disp_img = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))  # full black image
+            self.disp_draw = ImageDraw.Draw(self.disp_img) # image is drawned
+            
+        
+        # below part gets updated at every new cube_status sent
+        for i, color in enumerate(cube_status):            # iteration over the 24 facelets interpreted colors
+            B,G,R = self.c[color]                          # BGR values of the assigned colors for the corresponding detected color
+            x = self.tlc[i][0]+self.g                      # x coordinate for the origin-square colored facelet
+            y = self.tlc[i][1]+self.g                      # y coordinate for the origin-square colored facelet
+            dx = x + self.d - self.gg                      # x coordinate for the end-square colored facelet
+            dy = y + self.d - self.gg                      # y coordinate for the end-square colored facelet
+            self.disp_draw.rectangle((x, y, dx, dy), (B,G,R))   # cube sketch grid
+        
+        self.disp.display(self.disp_img)                   # image is drawned
+        self.disp.set_backlight(1)                         # display backlight is set on
+
+    
     
     
     def test1_display(self):

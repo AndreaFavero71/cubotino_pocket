@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero 26 January 2024
+# Andrea Favero 11 February 2024
 # 
 # From Kociemba solver to robot moves
 # This applies to CUBOTino Pocket, a simple Rubik's cube solver robot
@@ -29,26 +29,6 @@
 """
 
 
-"""
-Cube orientation at the start, later updated after every cube movement on the robot
-Dict key is the the "stationary" side, while the dict value is the cube side
-
-     
-v_faces{}   _______       
-           |       |
-           | ['U'] |
-           |_______|     h_faces{}  _______ _______ _______ 
-           |       |               |       |       |       |
-           | ['F'] |               | ['L'] | ['F'] | ['R'] |
-           |_______|               |_______|_______|_______|
-           |       |
-           | ['D'] |
-           |_______|    
-
-by knowing 5 faces, the 6th (B face) is also known ;-)
-""" 
-
-
 # Global variable
 # Below dict has all the possible robot movements, related to the cube solver string
 moves_dict = {'U1':'F2R1S3', 'U2':'F2R1S3R1S3', 'U3':'F2S1R3',
@@ -63,37 +43,93 @@ moves_dict = {'U1':'F2R1S3', 'U2':'F2R1S3R1S3', 'U3':'F2S1R3',
 
 
 
+
 def starting_cube_orientation(simulation=False):
-    """ Defines the starting cube orientation, after the cube scanning.
-        When simulating, the cube is considered as URF facing Up Right Front."""
+    """ Cube orientation at the start, later updated after every cube movement on the robot
+        Dict key is the the "stationary" side, while the dict value is the cube side
+        
+        After scanning the cube is not URF oriented.
+        When simulating, the cube is considered as URF facing Up Right Front.
+        By knowing 5 faces, the 6th face is also known ;-)
+        
+        
+        Case of simulation:
+        v_faces{}   _______       
+                   |       |
+                   | ['U'] |
+                   |_______|     h_faces{}  _______ _______ _______ 
+                   |       |               |       |       |       |
+                   | ['F'] |               | ['L'] | ['F'] | ['R'] |
+                   |_______|               |_______|_______|_______|
+                   |       |
+                   | ['D'] |
+                   |_______|    
+
+        
+        
+        Cube orientation after scanning (no simulation):
+        v_faces{}   _______       
+                   |       |
+                   | ['L'] |
+                   |_______|     h_faces{}  _______ _______ _______ 
+                   |       |               |       |       |       |
+                   | ['U'] |               | ['F'] | ['U'] | ['B'] |
+                   |_______|               |_______|_______|_______|
+                   |       |
+                   | ['R'] |
+                   |_______|
+        
+        
+        
+        Cubie numbering, to track the DBL corner
+        dbl cubie is at 6 (not visible on below sketch) when the cube is URF oriented
+        dbl cubie is at 2 when the cube after scanning
+             ______________ 
+            /1     /     2/|
+           /______/______/ |
+          /      /      /| |
+         /3_____/_____4/ | |
+         |      |      | |/|
+         |      |      | | | 
+         |______|______|/| 6
+         |      |      | |/
+         |      |      | /
+         |7_____|_____8|/
+        
+        
+        """
     
-    global h_faces,v_faces 
     
-    if not simulation:
-        # Cube orientation at the start (after scanning), later updated after every cube movement on the robot
-        h_faces={'L':'F','F':'U','R':'B'}   # dict with faces around the bottom/upper positioned faces
-        v_faces={'D':'R','F':'U','U':'L'}   # dict with faces around the left/right positioned faces
+    global h_faces,v_faces, dbl             # global variables used
     
-    elif simulation:
+    if simulation:                          # case simultion is set True
         # Cube orientation at the start (UFR), later updated after every cube movement on the robot
         h_faces={'L':'L','F':'F','R':'R'}   # dict with faces around the bottom/upper positioned faces
         v_faces={'U':'U','F':'F','D':'D'}   # dict with faces around the left/right positioned faces
+        dbl = 5                             # dbl cubie at start (cube as URF)
+    
+    elif not simulation:                    # case this function is called after scanning the cube
+        # Cube orientation after scanning, later updated after every cube movement on the robot
+        h_faces={'L':'F','F':'U','R':'B'}   # dict with faces around the bottom/upper positioned faces
+        v_faces={'U':'L','F':'U','D':'R'}   # dict with faces around the left/right positioned faces
+        dbl = 2                             # dbl cubie at start (cube after the scanning)
+    
 
-
-
+    
+    
 
 
 def opp_face(face):
     """ This function returns the opposite face of the one in argument."""
     
-    if face == 'F': return 'B'
-    elif face == 'B': return 'F'
-    elif face == 'U': return 'D'
-    elif face == 'D': return 'U'
-    elif face == 'R': return 'L'
-    elif face == 'L': return 'R'
-    else:
-        return 'Error'
+    if face == 'F': return 'B'              # case face is F its returned opposite is B
+    elif face == 'B': return 'F'            # case face is B its returned opposite is F
+    elif face == 'U': return 'D'            # case face is U its returned opposite is D
+    elif face == 'D': return 'U'            # case face is D its returned opposite is U
+    elif face == 'R': return 'L'            # case face is R its returned opposite is L
+    elif face == 'L': return 'R'            # case face is L its returned opposite is R
+    else:                                   # case face is not captured on above cases
+        return 'Error'                      # error string is returned
 
 
 
@@ -104,10 +140,31 @@ def flip_effect(h_faces,v_faces):
     """ Returns the cube faces orientation after a single Flip action; Only v_faces are affected
         It applies a face shift of these faces, and updates the F face on the h_faces dict."""
     
-    v_faces['D']=v_faces['F']
-    v_faces['F']=v_faces['U']
-    v_faces['U']=opp_face(v_faces['D'])
-    h_faces['F']=v_faces['F']
+    global dbl                              # global dbl is used
+    v_faces['D']=v_faces['F']               # vertical face shift
+    v_faces['F']=v_faces['U']               # vertical face shift
+    v_faces['U']=opp_face(v_faces['D'])     # vertical face shift, via opposite face
+    h_faces['F']=v_faces['F']               # vertical face shift
+    dbl=flip_dbl(dbl)                       # dbl cubie location is updated
+
+
+
+
+
+
+def flip_dbl(dbl):
+    """ Returns the dbl cubie position after a Flip."""
+    
+    if dbl==1 or dbl==2:                    # case dbl cubie is at 1 or 2
+        dbl += 2                            # cubie is shifted by +2
+    elif dbl==3 or dbl==4:                  # case dbl cubie is at 3 or 4
+        dbl += 4                            # cubie is shifted by +4
+    elif dbl==5 or dbl==6:                  # case dbl cubie is at 5 or 6
+        dbl -= 4                            # cubie is shifted by -4
+    elif dbl==7 or dbl==8:                  # case dbl cubie is at 7 or 8
+        dbl -= 2                            # cubie is shifted by -2
+    return dbl                              # shifted dbl cubie is returned
+
 
 
 
@@ -118,11 +175,30 @@ def spinCCW_effect(h_faces,v_faces):
     """ Returns the cube faces orientation after a single CCW spin action; Only h_faces are affected
         It applies a face shiftof these faces, and updates the F face on the v_faces dict."""
     
-    h_faces['L']=h_faces['F']
-    h_faces['F']=h_faces['R']
-    h_faces['R']=opp_face(h_faces['L'])
-    v_faces['F']=h_faces['F']
+    global dbl                              # global dbl is used
+    h_faces['L']=h_faces['F']               # CCW face shift
+    h_faces['F']=h_faces['R']               # CCW face shift
+    h_faces['R']=opp_face(h_faces['L'])     # CCW face shift, via opposite face
+    v_faces['F']=h_faces['F']               # CCW face shift
+    dbl = spinCCW_dbl(dbl)                  # dbl cubie location is updated
        
+
+
+
+
+
+def spinCCW_dbl(dbl):
+    """ Returns the dbl cubie position after a CCW rotation."""
+    
+    if dbl==1 or dbl==5:                    # case dbl cubie is at 1 or 5
+        dbl += 1                            # cubie is shifted by +1
+    elif dbl==2 or dbl==6:                  # case dbl cubie is at 2 or 6
+        dbl += 2                            # cubie is shifted by +2
+    elif dbl==3 or dbl==7:                  # case dbl cubie is at 3 or 7
+        dbl -= 2                            # cubie is shifted by -2
+    elif dbl==4 or dbl==8:                  # case dbl cubie is at 4 or 8
+        dbl -= 1                            # cubie is shifted by -1
+    return dbl                              # shifted dbl cubie is returned
 
 
 
@@ -132,10 +208,33 @@ def spinCW_effect(h_faces,v_faces):
     """ Returns the cube faces orientation after a single CW spin action; Only h_faces are affected
         It applies a face shiftof these faces, and updates the F face on the v_faces dict."""
     
-    h_faces['R']=h_faces['F']
-    h_faces['F']=h_faces['L']
-    h_faces['L']=opp_face(h_faces['R'])
-    v_faces['F']=h_faces['F']
+    global dbl                              # global dbl is used
+    h_faces['R']=h_faces['F']               # CW face shift
+    h_faces['F']=h_faces['L']               # CW face shift
+    h_faces['L']=opp_face(h_faces['R'])     # CW face shift, via opposite face
+    v_faces['F']=h_faces['F']               # CW face shift
+    dbl = spinCW_dbl(dbl)                   # dbl cubie location is updated
+    
+
+
+
+
+
+
+def spinCW_dbl(dbl):
+    """ Returns the dbl cubie position after a CW rotation."""
+    
+    if dbl==1 or dbl==5:                    # case dbl cubie is at 1 or 5
+        dbl += 2                            # cubie is shifted by +2
+    elif dbl==2 or dbl==6:                  # case dbl cubie is at 2 or 6
+        dbl -= 1                            # cubie is shifted by -1
+    elif dbl==3 or dbl==7:                  # case dbl cubie is at 3 or 7
+        dbl += 1                            # cubie is shifted by +1
+    elif dbl==4 or dbl==8:                  # case dbl cubie is at 4 or 8
+        dbl -= 2                            # cubie is shifted by -2
+    return dbl                              # shifted dbl cubie is returned
+
+
 
 
 
@@ -157,7 +256,7 @@ def cube_orient_update(movement):
         
         elif movement[i] == 'S':                   # case there is a cube spin on robot movements
             repeats=int(movement[i+1])             # retrieves how many spin
-            if repeats=='3':                       # case the spin is CCW
+            if repeats==3:                         # case the spin is CCW
                 spinCCW_effect(h_faces,v_faces)    # re-order the cube orientation on the robot due to the CCW spin
             else:                                  # case the spin is CW
                 for j in range(repeats):           # iterates over the amount of spin
@@ -174,24 +273,49 @@ def adapt_move(move):
         This function will then swap the face name, instead to move the cube back on the original position
         The function returns a dict with all the robot moves and the total amount."""
     
-    global h_faces,v_faces
+    global h_faces,v_faces,dbl_move
     
-    face_to_turn = move[0]                        # face to be turned according to the solver 
-    rotations = move[1]                           # rotations (string) to be applied according to the solver 
-    
+    face_to_turn = move[0]                        # face to be turned according to the solver
+    rotations = move[1]                           # rotations (string) to be applied according to the solver
+        
     cube_orientation=h_faces.copy()               # generating a single cube orientation dict with h_faces
     cube_orientation.update(v_faces)              # generating a single cube orientation dict with h_faces and v_faces
     
-    solution_in_dict = True                       # boolean for easier code reading... 80% chances the face is in dict...
-    
+    dbl_move = False
+    if face_to_turn in ('D', 'B', 'L'):           # case the face_to_turn affects the DBL corner
+        dbl_move = True                           # dbl_move variable is set True
+        
     for side, face in cube_orientation.items():   # iteration over the current cube orientation dict (5 sides)
         if face == face_to_turn:                  # case the face to be turned is in the dictionary value
-            return side+rotations                 # the dictionary key is returned, as the effective face location
+            return side+rotations, dbl_move       # the dictionary key is returned, as the effective face location
         else:                                     # case the face to be turned is not in the dictionary value
             solution_in_dict = False              # boolean variable is changed to False
     
     if solution_in_dict == False:                 # case the face to be turned is not in the dictionary value
-        return 'B'+rotations                      # the face to be turned must be the 6th one, the B side
+        return 'B'+rotations, dbl_move            # the face to be turned must be the 6th one, the B side
+
+
+
+
+
+
+
+def change_cube_orientation(robot_seq):
+    """This function is called when the DBL corner gets rotated caused by a D B L face rotation.
+    This is necessary to reflect the dbl rotation (CW or CCW) with reference to the adiacent layer.
+    This function is not necessary on a 3x3x3 cube.
+    As outcome, the complete 'cube' is reoriented on the tracked orientation.
+    """
+    
+    global h_faces,v_faces,dbl
+      
+    for i in range(0,len(robot_seq),2):         # iteration over the robot movements
+        move = robot_seq[i:i+2]                 # single ronot movement
+        if 'R3'in move and dbl in (5,6,7,8):    # case the bottom layer is CCW rotated and dbl cubie on the bottom layer
+            spinCCW_effect(h_faces,v_faces)     # update the orientation to the real cube position on the robot
+        elif 'R1'in move and dbl in (5,6,7,8):  # case the bottom layer is CW rotated and dbl cubie on the bottom layer
+            spinCW_effect(h_faces,v_faces)      # update the orientation to the real cube position on the robot
+
 
 
 
@@ -241,14 +365,14 @@ def optim_moves1(moves, informative):
 
     else:                                # case the moves string has the need to be optimized
         to_remove=[]                     # empty list to be populated with all indididual characters to be removed from the moves
-        for i in to_optmize:                        # iteration over the list of moves to be optimized
-            to_remove.append((i, i+1, i+2, i+3))    # list is populated with the 4 caracters of the 2 moves
+        for i in to_optmize:             # iteration over the list of moves to be optimized
+            to_remove.append((i, i+1, i+2, i+3))   # list is populated with the 4 caracters of the 2 moves
         
-        new_moves=''                                # empty string to hold the new robot moves 
+        new_moves=''                     # empty string to hold the new robot moves 
         remove = [item for sublist in to_remove for item in sublist] # list of characters is flattened
-        for i in range(str_length):                 # iteration over all the characters of original moves
-            if i not in remove:                     # case the index is not included in the list of those to be skipped
-                new_moves+=moves[i]                 # the character is added to the new string of moves 
+        for i in range(str_length):      # iteration over all the characters of original moves
+            if i not in remove:          # case the index is not included in the list of those to be skipped
+                new_moves+=moves[i]      # the character is added to the new string of moves 
         
         if informative:
             print("Robot moves string: applied optimization type 1")
@@ -256,7 +380,7 @@ def optim_moves1(moves, informative):
         if printout:
             print("new_moves at opt1: ", new_moves)
             print("len new_moves at opt1:", len(new_moves))
-        return new_moves, 1                      # the new string of robot moves is returned
+        return new_moves, 1              # the new string of robot moves is returned
 
 
 
@@ -266,7 +390,7 @@ def optim_moves1(moves, informative):
 def optim_moves2(moves, informative):
     """Removes 2 flips when the second-last flip is F3, the last one is F2 and both are followed by same spins/rotations.
         Under these conditions, the second-last flip (F3) can be changed (to F1)."""
-    # the case for this optimization is never found on th 2x2x2
+    # the case for this optimization is never found on the 2x2x2 cube
 
 
 
@@ -322,14 +446,48 @@ def count_moves(moves):
         if moves[i] == 'F':           # case there is a cube flip on robot movements
             flips=int(moves[i+1])     # retrieves how many flips
             robot_tot_moves+=flips    # increases the total amount of robot movements
-
         elif moves[i] == 'R':         # case there is a layer rotation on robot movements
             robot_tot_moves+=1        # increases by 1 (cannot be more) the total amount of robot movements
-        
         elif moves[i] == 'S':         # case there is a cube spin on robot movements
             robot_tot_moves+=1        # increases by 1 (cannot be more) the total amount of robot movements
-    
     return robot_tot_moves            # total amount of robot moves is returned
+
+
+
+    
+
+
+def alt_solutions(solution):
+    """ This function generates alternative solutions (cube face rotations), by including the D B L faces rotations."""
+    
+    if len(solution)>2:
+        solutions = [solution]
+        sol = solution[:2]
+        sol_0 = solution[2:]
+        sol_1 = sol_0
+        sol_2 = sol_0
+        sol_3 = sol_0
+        sol_4 = sol_0
+        sol_5 = sol_0
+        sol_6 = sol_0
+        
+        if 'U' in sol_1:
+            solutions.append(sol + sol_1.replace('U', 'D'))
+        if 'R' in sol_2:
+            solutions.append(sol + sol_2.replace('R', 'L'))
+        if 'F' in sol_3:
+            solutions.append(sol + sol_3.replace('F', 'B'))
+        if 'U' in sol_4 and 'R' in sol_4:
+            solutions.append(sol + sol_4.replace('U', 'D').replace('R', 'L'))
+        if 'U' in sol_5 and 'F' in sol_5: 
+            solutions.append(sol + sol_5.replace('U', 'D').replace('F', 'B'))
+        if 'R' in sol_6 and 'F' in sol_6:
+            solutions.append(sol + sol_6.replace('R', 'L').replace('F', 'B'))
+        return solutions
+    
+    else:
+        return solution
+
 
 
 
@@ -341,7 +499,7 @@ def robot_required_moves(solution, solution_Text, simulation, informative=False)
         Based on the dict with all the robot moves, a string with all the movements is generated.
         The string with the robot movements might differ from the dict, when optimizing is possible."""
     
-    global h_faces,v_faces
+    global h_faces,v_faces,dbl,dbl_move
     
     solution=solution.strip()                     # eventual empty spaces are removed from the string
     solution=solution.replace(" ", "")            # eventual empty spaces are removed from the string
@@ -357,19 +515,33 @@ def robot_required_moves(solution, solution_Text, simulation, informative=False)
         for block in range(blocks):               # iteration over blocks of movements
             move=solution[:2]                     # move to be applied on this block, according to the solver
             solution=solution[2:]                 # remaining movements from the solver are updated
-            adapted_move=adapt_move(move)         # the move from solver is adapted considering the real cube orientation
+            adapted_move, dbl_move = adapt_move(move)   # the move from solver is adapted considering the real cube orientation
             robot_seq=moves_dict[adapted_move]    # robot movement sequence is retrieved
             robot[block]=robot_seq                # robot movements dict is updated
             moves+=robot_seq                      # robot movements string is updated
             cube_orient_update(robot_seq)         # cube orientation updated after the robot move from this block
-                           
+            
+            if dbl_move:                          # case the DBL corner has been rotated at least once (wrt other layers )
+                change_cube_orientation(robot_seq)  # the cube orientation is adapted
+        
         moves, opt1 = optim_moves1(moves, informative)  # removes eventual unnecessary moves (that would cancel each other out)
         moves, opt3 = optim_moves3(moves, informative)  # removes eventual unnecessary flips
         robot_tot_moves = count_moves(moves)      # counter for the total amount of robot movements
-        opt = (opt1 ,opt3)
-        
+        opt = (opt1, opt3)                        # tuple indicating if the optimizers have been effective
+    
+    else:                                         # case the solver returned an error
+        opt = (0,0)                               # tuple indicating the optimizers has not been effective
+    
+    
+    # info:
+    # "robot" variable (dict type) has all the robot movements prio the optimization analysis
+    # "moves" variable (string typ) likely differs from the dict content due to optimized moves
+    # "opt" tuple indicates if the optimezers (and positonally which one) could reduce the robot moves
     return robot, moves, robot_tot_moves, opt # returns a dict with all the robot moves, string with all the moves and total robot movements
-    # NOTE: dict has all the theorethical robot movements, the string might differ due to optimization
+    
+
+
+
 
 
 
@@ -382,8 +554,8 @@ if __name__ == "__main__":
         Afterward all the strings are combined in a single string, for the Cubotino_servo.py module to control the servos."""  
     
     
-    solution = 'U2 D2 R2 L2 F2 B2'  # this cube solution allows type 2 optimization (2 flips removal)
 #     solution = 'U3 R3 F3 U3 F3'     # this cube solution allows type 3 optimization (2 flips removal)
+    solution = 'F3R3U3'
 
     print()
     print("Example of robot movements for solver solution: ", solution)
@@ -392,19 +564,18 @@ if __name__ == "__main__":
     print("Example 'F1R1S3' means: 1x cube Flip, 1x (90deg) CW rotation of the 1st (bottom) layer, 1x (90deg) CCW cube Spin")
     print()
     
-
-    solution_Text = ""
-    robot, moves, robot_tot_moves = robot_required_moves(solution, solution_Text, informative=False, simulation=True)
-    print(f'\nnumber of robot movements: {robot_tot_moves}')
     
-    print()    
-    print(f'robot movements: ')
-    
-    servo_moves=""
-    for step, movements in robot.items():
-        print(f'step:{step}, robot moves:{movements}')
-        servo_moves+=moves
-    
-    print(f'\nstring command to the robot servos driver: {moves}\n')
-    
-
+    solutions = alt_solutions(solution)
+    print("\nPossible alternative solutions:", solutions)
+            
+    for solution in solutions:
+        print(f'\nSolution: {solution}')
+        solution_Text = ""
+        robot, moves, robot_tot_moves, opt = robot_required_moves(solution, solution_Text, informative=False, simulation=False)
+        print(f'Number of robot movements: {robot_tot_moves}')
+        print(f'Robot movements: ')
+        servo_moves=""
+        for step, movements in robot.items():
+            print(f'step:{step}, robot moves:{movements}')
+            servo_moves+=moves
+        print(f'String command to the robot servos driver: {moves}\n')
