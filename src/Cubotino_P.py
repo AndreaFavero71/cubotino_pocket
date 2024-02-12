@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero, 11 February 2024
+#  Andrea Favero, 12 February 2024
 #
 #  This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 #  CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -2756,8 +2756,8 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_stat
         # movements to the robot are finally applied
         solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
         
-        
-        animation(screen, ref_colors_BGR, cube_status_string, robot_moves)    # plot on screen the facelets animation 
+        if solution_Text != 'Error':            # case the solver has returned an error
+            animation(screen, ref_colors_BGR, cube_status_string, robot_moves)    # plot on screen the facelets animation 
         
         # some relevant info are logged into a text file
         log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner,
@@ -2836,9 +2836,9 @@ def check_headers(folder, fname):
     """
     
     with open(fname, 'r') as f:                     # file is opened, to adjust the headers in case
-        line = f.readline().strip('\n').strip('\t')  # file line without spaces nor tab characteres at line start/end
+        line = f.readline().strip('\n').strip('\t') # file line without spaces nor tab characteres at line start/end
         headers = line.split('\t')                  # file headers are listed
-        added_headers = ('Flip2close', 'OS_ver')    # additional headers (tuple where to add eventual new headers after the first script release)
+        added_headers = ('OS_ver', 'DBL')           # additional headers (tuple where to add eventual new headers after the first script release)
         latest_header = added_headers[-1]           # header meant to be the latest
         last_header = headers[-1].strip().strip('\t') # header found as last
         
@@ -2913,17 +2913,18 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
         h = 'FaceletsDetectionTime(s)'                  # column header
         i = 'CubeSolutionTime(s)'                       # column header
         k = 'RobotSolvingTime(s)'                       # column header
-        l = 'SlowTime(s)'                               # column header                            
-        m = 'CubeStatus(BGR)'                           # column header
-        n = 'CubeStatus'                                # column header
-        o = 'CubeSolution'                              # column header
-        p = 'OS_ver'                                    # column header
-        q = 'FCS'                                       # column header
+        l = 'SlowTime(s)'                               # column header
+        m = 'FCS'                                       # column header
+        n = 'URF/DBL'                                   # column header
+        o = 'OS_ver'                                    # column header
+        p = 'CubeStatus'                                # column header
+        q = 'CubeSolution'                              # column header
+        r = 'CubeStatus(BGR)'                           # column header
 
         
         
         # tab separated string of the the headers
-        log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o,p,q)    # tuple with the columns headers
+        log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o,p,q,r)  # tuple with the columns headers
         log_data_len = len(log_data)                    # elements in tuple
         s=''                                            # empty string is assigned to the variable s
         for i, header in enumerate(log_data):           # interation trhough the tuple
@@ -2938,10 +2939,23 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
         # 'a'means: file will be generated if it does not exist, and data will be appended at the end
         with open(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o777), 'a') as f:    # text file is temporary opened
             f.write(s)               # data is appended
-    
+
+
+# uncomment the first time new headers will be added (after the 1st release
+###########################    
 #     else:                                               # case the file does exist
-#         check_headers(folder, fname)                    # checks if necessary to add new headers to the log file                            
-           
+#         check_headers(folder, fname)                    # checks if necessary to add new headers to the log file
+###########################
+    
+    if color_detection_winner != 'Error':               # case the cube_detection_status doe not equal 'Error'
+        css = cube_status_string                        # it is assigned to css variable
+        if 'D' in css or 'B' in css or 'L' in css:      # case DBL characters in css (cube_status_string)
+            urf_dbl='DBL'                               # 'DBL'is assigned to urf_dbl variable
+        else:                                           # case DBL in not in css (cube_status_string)
+            urf_dbl='URF'                               # 'URF'is assigned to urf_dbl variable
+    else:                                               # case the cube_detection_status equals 'Error'
+        css = '#' * 24                                  # 24*'#' are assigned to css variable
+        urf_dbl = 'Error'                               # 'Error'is assigned to urf_dbl
     
     # info to log
     a=str(timestamp)                                    # date and time
@@ -2955,15 +2969,15 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
     i=str(round(cube_solution_time-cube_detect_time,1)) # time to get the cube solution from the solver
     k=str(round(robot_solving_time,1))                  # time to manoeuvre the cube to solve it
     l=str(round(slow_time_s,1))                         # pause after each servo movement during solving (for slowering demo scope)
-    m=str(facelets_data)                                # according to which method delivered the solution (BGR)
-    n=str(cube_status_string)                           # string with the detected cbe status
-    o=str(solution)                                     # solution returned by Kociemba solver
-    p=str(os_version)                                   # os_version
-    q=str(fcs)                                          # faces quantity where the Fix Coordinates System was used
-    
+    m=str(fcs)                                          # faces quantity where the Fix Coordinates System was used
+    n=str(urf_dbl)                                      # solution included DBL faces
+    o=str(os_version)                                   # os_version
+    p=str(css)                                          # string with the detected css (cube_status_string)
+    q=str(solution)                                     # solution returned by Kociemba solver
+    r=str(facelets_data)                                # facelts colors value according to the winning method
     
     # tab separated string with info to log
-    log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o,p,q)        # tuple with the columns data
+    log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o,p,q,r)      # tuple with the columns data
     log_data_len = len(log_data)                        # elements in tuple
     s=''                                                # empty string is assigned to the variable s
     for i, data in enumerate(log_data):                 # interation trhough the tuple
@@ -4041,7 +4055,7 @@ def cubeAF():
                 
                 if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:   # case the facelets detection takes more than fcs_delay secs
                     facelets, frame = get_facelets_fcs(facelets, frame)   # facelets info are based on fix coordinates
-                    fix_c += 1                                         # fcs (Fix Coordinates System) is incremented
+                    fcs += 1                                           # fcs (Fix Coordinates System) is incremented
                 
                 if corners==4:                                         # contours with 4 corners are of interest
                     facelets, frame = get_facelets(facelets, frame, contour, hierarchy) # returns a dict with cube compatible contours
