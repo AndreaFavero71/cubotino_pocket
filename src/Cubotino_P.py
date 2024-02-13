@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero, 12 February 2024
+#  Andrea Favero, 13 February 2024
 #
 #  This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 #  CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -28,7 +28,7 @@
 
 
 # __version__ variable
-version = '1.0 (11 Feb 2024)'
+version = '1.1 (13 Feb 2024)'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -1975,7 +1975,7 @@ def scrambling_cube():
     # Kociemba solver is called to have the solution string
     solution, solution_Text, robot_moves, total_robot_moves, est_time = cube_solution(random_cube_string, scrambling = True)
     
-    print("Cube solution:", solution_Text)  # feedback is printed to the terminal
+    print("Cube solution:", solution)  # feedback is printed to the terminal
     
     # dict and string with robot movements, and total movements
     _, robot_moves, total_robot_moves, _ = rm.robot_required_moves(solution, solution_Text, simulation=False, informative=debug)
@@ -2756,14 +2756,13 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_stat
         # movements to the robot are finally applied
         solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
         
-        if solution_Text != 'Error':            # case the solver has returned an error
+        if solution_Text != 'Error' and not robot_stop:  # case the solver has not returned an error and no stop requests
             animation(screen, ref_colors_BGR, cube_status_string, robot_moves)    # plot on screen the facelets animation 
         
         # some relevant info are logged into a text file
         log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner,
                  tot_robot_time, start_time, camera_ready_time, cube_detect_time, cube_solution_time,
                  robot_solving_time, slow_time_s, os_version, fcs)
-        
         
         deco_info = (fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, \
                      cube_status_string, URFDLB_facelets_BGR_mean, \
@@ -3092,7 +3091,7 @@ def stop_cycle(button):
 
 
 def robot_set_GPIO():
-    """ Raspberry Pi requires some settings at the GPIO (General Purpose imput Output)
+    """ Raspberry Pi requires some settings at the GPIO (General Purpose Input Output)
     This function sets the GPIO way of working
     This function also sets an interrupt for the start/stop button."""
     
@@ -3327,9 +3326,10 @@ def start_automated_cycle(cycle, total, cycle_pause):
                 if time_left % 2 == 0:    # case the time_left is even
                     elapsed_t+=2          # elapsed time is increased by two
                     progress = round(elapsed_t/(cycle_pause),3)   # progress 
-                    print("\rNext cycle:   elapsed time {0:}s   [{1:50s}] {2:}%   still left {3:}s          ".format(
-                        elapsed_t, '.' *int(progress*50), round(progress*100,1), time_left), end="", flush=True)
                     
+                    print("\rNext cycle in {0:}s  [{1:50s}] {2:}%   ".format(
+                        time_left, '#'*int(progress*50), round(progress*100,1)), end="", flush=True)
+   
                     if screen1:           # case boolean screen1 is true
                         disp.show_on_display('FOR CYCLE', f'{cycle+1} / {total}', fs1=21, fs2=24)  #feedbak is print to to the display
                         screen1 = False   # boolean screen1 is set false
@@ -3883,8 +3883,6 @@ def animation(screen, ref_colors_BGR, cube_status_string, robot_moves):
         
     frames = len(csa)                               # len(csa) defines the frames quantity
     
-    animation_activated = True                      # animation_activated is set True
-    
     if animation_activated:                         # case animation_activated is set True
         for i in range(frames):                     # iteration over the frames quantity
             if i == 0:                              # case of the first frame
@@ -3905,7 +3903,7 @@ def animation(screen, ref_colors_BGR, cube_status_string, robot_moves):
             elif i< frames-1:                       # case from the 2nd to the last but frames
                 show_ms = t2                        # sketch showing time as per t1
                 plot_animation(show_ms, ref_colors_BGR, csa[i])  # initial cube status is plot to the screen
-            else:                                   # case for the last frames
+            if i == frames-1:                       # case for the last frames (the new if serves the case of 1 frames)
                 show_ms = t1                        # sketch showing time as per t1
                 # the final cube status is plot to the screen, with kill instruction
                 plot_animation(show_ms, ref_colors_BGR, csa[i], kill=True)
@@ -4120,15 +4118,19 @@ def cubeAF():
                             solution, solution_Text, robot_moves, total_robot_moves, est_time = cube_solution(cube_status_string)
                             color_detection_winner = 'BGR'       # variable used to log which method gave the solution
                             cube_solution_time = time.time()     # time stored after getting the cube solution
+                            
+                            # feedback to terminal
                             print(f'\nCube status : {cube_status_string}')   # feedback is printed to the terminal
-                            if 'B'in solution or 'D' in solution or 'L' in solution:  # case of a DBL solution
-                                print(f'Selected (optimized) solution : {solution}')   # feedback is printed to the terminal
-                            else:                                # case of URF solution
-                                print(f'Selected solution : {solution}')   # feedback is printed to the terminal
-                            print(f'Camera warm-up, camera setting, cube status (BGR), and solution, in: {round(time.time()-start_time,1)} secs')         
-
-                            if solution_Text == 'Error':         # case  colors interpretation via BGR color distance fails
+                            if solution_Text == 'Error':         # case the cube solution equals Error
                                 print(f'Solver return: {solution}\n')  # feedback is printed to the terminal
+                            else:                                # case the cube solution is not Error
+                                if len(solution)!=0:             # case the solution lenght is not zero
+                                    if 'B'in solution or 'D' in solution or 'L' in solution:  # case of a DBL solution
+                                        print(f'Selected (optimized) solution : {solution}')   # feedback is printed to the terminal
+                                    else:                        # case of URF solution
+                                        print(f'Selected solution : {solution}')   # feedback is printed to the terminal
+                            print(f'Camera warm-up, camera setting, cube status (BGR), and solution, in: {round(time.time()-start_time,1)} secs')         
+                                
                         
                         elif len(cube_status) == 0:              # case the cube_status is empty (cube detection error)
                             solution = ''

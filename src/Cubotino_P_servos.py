@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero, 11 February 2024
+# Andrea Favero, 13 February 2024
 #
 # This code relates to CUBOTino Pocket, a very small and simple Rubik's cube solver robot 3D printed.
 # CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -94,12 +94,10 @@ def load_servos_parameters(print_out):
     global b_servo, b_min_pulse_width, b_max_pulse_width                                    # bottom servo and pulse width
     global b_servo_CCW, b_servo_CW, b_home, b_rel_CW, b_rel_CCW, b_extra_home_CW, b_extra_home_CCW   # bottom servo angles
     global b_servo_CCW_rel, b_servo_CW_rel, b_home_from_CCW, b_home_from_CW                 # bottom servo calculated angles
-    global b_servo_home, b_servo_stopped, b_servo_CW_pos, b_servo_CCW_pos                   # bottom servo status 
-    global b_spin_time, b_rotate_time, b_rel_time                                           # bottom servo timers 
+    global b_servo_home, b_servo_stopped, b_servo_CW_pos, b_servo_CCW_pos                   # bottom servo status
+    global b_spin_time, b_rotate_time, b_rel_time                                           # bottom servo timers
     
-    global flip_to_close_one_step
-    
-    timer = {}
+
     from Cubotino_P_update_settings_file import update_srv_settings_file
     
     # convenient choice for Andrea Favero, to upload the settings fitting his robots, via mac address check
@@ -170,19 +168,20 @@ def load_servos_parameters(print_out):
             return robot_init_status                                              # return robot_init_status variable, that is False
     
         # bottom servo derived positions
-        b_servo_CCW_rel = round(b_servo_CCW + b_rel_CCW,3)    # bottom servo position to rel tensions when fully CW
-        b_servo_CW_rel = round(b_servo_CW - b_rel_CW,3)       # bottom servo position to rel tensions when fully CCW
-        b_home_from_CW = round(b_home - b_extra_home_CW,3)    # bottom servo extra home position, when moving back from full CW
-        b_home_from_CCW = round(b_home + b_extra_home_CCW,3)  # bottom servo extra home position, when moving back from full CCW
+        b_servo_CCW_rel = round(b_servo_CCW + b_rel_CCW,3)      # bottom servo position to rel tensions when fully CW
+        b_servo_CW_rel = round(b_servo_CW - b_rel_CW,3)         # bottom servo position to rel tensions when fully CCW
+        b_home_from_CW = round(b_home - b_extra_home_CW,3)      # bottom servo extra home position, when moving back from full CW
+        b_home_from_CCW = round(b_home + b_extra_home_CCW,3)    # bottom servo extra home position, when moving back from full CCW
         
         # top servo derived position
-        t_servo_rel = round(t_servo_close - t_servo_rel_delta,3)     # top servo position to release tension
+        t_servo_rel = round(t_servo_close - t_servo_rel_delta,3) # top servo position to release tension
         
-        timer['t_flip_to_close_time'] = t_flip_to_close_time
+        timer = {}                                              # dict to store the servos timer values
+        timer['t_flip_to_close_time'] = t_flip_to_close_time 
         timer['t_close_to_flip_time'] = t_close_to_flip_time
         timer['t_flip_open_time'] = t_flip_open_time
         timer['t_open_close_time'] = t_open_close_time
-        if t_servo_rel < t_servo_close:                          # case the t_servo_rel_delta is > zero
+        if t_servo_rel < t_servo_close:                         # case the t_servo_rel_delta is > zero
             timer['t_rel_time'] = t_rel_time
         else:
             timer['t_rel_time'] = 0
@@ -190,8 +189,8 @@ def load_servos_parameters(print_out):
         timer['b_rotate_time'] = b_rotate_time
         timer['b_rel_time'] = b_rel_time
     
-    else:                                                                   # case the servo_settings file does not exists, or name differs
-        print('Could not find Cubotino_P_servo_settings.txt')               # feedback is printed to the terminal                                  
+    else:                                                       # case the servo_settings file does not exists, or name differs
+        print('Could not find Cubotino_P_servo_settings.txt')   # feedback is printed to the terminal                                  
     
     return timer   # return robot timers
 
@@ -204,16 +203,17 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
     """ Function to initialize the robot (servos position) and some global variables, do be called once, at the start."""
     
     global robot_init_status, fun_status, flip_to_close_one_step, led_init_status, top_cover_led
+    global flip_to_close_one_step
     
     set_display()
     
     if not led_init_status:                   # case the led_init_status variable is false
         led_init_status, top_cover_led = init_top_cover_led()  # the GPIO for the led is initialezed
-        
+ 
+    
     if not robot_init_status:                 # case the inititialization status of the servos false
         
         from Cubotino_P_pigpiod import pigpiod as pigpiod # start the pigpiod server
-        
         
         if f_to_close_mode:                   # case the init got the f_to_close_mode as true
             flip_to_close_one_step = True     # flip_to_close_one_step is set true
@@ -239,13 +239,17 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         robot_init_status = True              # boolean to track the inititialization status of the servos is set true
         if print_out:                         # case the print_out variable is set true
             print("\nServo init done")        # feedback is printed to the terminal
-    
-        servo_start_pos(start_pos)            # servos are positioned to the start position    
+        
+        if start_pos !=0:                     # case the start_pos is not zero
+            servo_start_pos(start_pos)        # servos are positioned to the start position    
         fun_status=False                      # boolean to track the robot fun status, it is True after solving the cube :-)
         cam_led_test()                        # makes a very short led test
         cam_led_Off()                         # forces the led off
         
-    return robot_init_status, timer           # returns the init status and the timer(s) values
+        return robot_init_status, timer       # returns the init status and the timer(s) values
+    
+    else:                                     # caase robot_init_status already True
+        return True                           # confirms the init status, and don't return thetimer
 
 
 
@@ -1336,7 +1340,7 @@ def test_servos_positions():
     
     
     print_info()                  # tuning info are printed to the terminal
-    init_servo(print_out=s_debug, start_pos='read')     # servos are initialized
+    init_servo(print_out=s_debug, start_pos='open')     # servos are initialized
     t_servo.value = t_servo_open  # top servo is rotated to open position (as defined at the json file)
     parameters = update_parameters()  # parameters for --tune are updated
 
@@ -1662,25 +1666,28 @@ if __name__ == "__main__":
     
     ##################### setting the servo to mid angle, or to traget, from the CLI  #############
     import argparse
-    parser = argparse.ArgumentParser(description='Servo parameter for middle and other positions') # argument parser object creation
+    parser = argparse.ArgumentParser(description='Servo parameter for middle and other positions.  '\
+                                     'Or just a sequence of movements test.') # argument parser object creation
     parser.add_argument("--set", type=float, 
                         help="Set both servos to PWM value (value range from -1.00 to 1.00)")      # argument is added to the parser
     parser.add_argument("--tune", action='store_true',
                         help="Check individual servo default positions, to find the best tune")    # argument is added to the parser
     parser.add_argument("--fast", action='store_true',
                         help="From Flip-Up to close in one step instead of two")    # argument is added to the parser
-    parser.add_argument("--slow", type=int,
-                        help="Imput additional resting (integer as tenth of secs) per each servo movement") # argument is added to the parser
+    parser.add_argument("--slow_t", type=int,
+                        help="Input additional resting (integer as tenth of secs) per each servo movement") # argument is added to the parser
     args = parser.parse_args()                             # argument parsed assignement
     # #############################################################################################
     
     
 
     #####################  applying the arguments   ###############################################
+    tuning = False                       # tuning variable is set False
     if args.fast == True:                # case the Cubotino_P_servo.py has been launched with 'speed' argument
         flip_to_close_one_step = True    # f_to_close steps (steps from flip up to close) is set True (= 1 step)
         
     if args.set != None:                                   # case the Cubotino_P_servo.py has been launched with 'set' argument
+        tuning = True                                      # tuning variable is set True
         init_servo(print_out=s_debug, start_pos=0)         # servo objectes are created, and set initially to mid position (by default)
         set_servos_pos(args.set)                           # servos are set according to the value in 'set' argument
         while True:                                        # infinite loop, to give the chance to play with the servos angles
@@ -1692,17 +1699,18 @@ if __name__ == "__main__":
                 print('\nQuitting Cubotino_P_servos.py\n\n')  # feedback is printed to terminal
                 break                                      # while loop is interrupted
     
-    if args.tune == True:                 # case the Cubotino_P_servo.py has been launched with 'tune' argument
-        import readline                   # library for easier typing at the CLI
-        test_servos_positions()           # calls the function to test the individual servos positions
+    if args.tune == True:                     # case the Cubotino_P_servo.py has been launched with 'tune' argument
+        tuning = True                         # tuning variable is set True
+        import readline                       # library for easier typing at the CLI
+        test_servos_positions()               # calls the function to test the individual servos positions
     
-    slow_time=0
-    if args.slow != None:                 # case the Cubotino_P_servo.py has been launched with 'slow' argument
-        slow_time = args.slow             # argument is assigned to the slow_time variable
-        slow_time = slow_time/10          # slow_time variabe is converted to seconds
-        test_set_of_movements(slow_time=slow_time)  # call to the function that holds the predefined set of movements
-        
-    else:     # case the Cubotino_P_servos.py has been launched without 'set' or 'tune' arguments
-        test_set_of_movements()           # call to the function that holds the predefined set of movements
+    if not tuning:                            # tcase uning variable is set False
+        slow_time=0                           # slow_time is set to zero
+        if args.slow_t != None:               # case the Cubotino_P_servo.py has been launched with 'slow_t' argument
+            slow_time = (args.slow_t)/10      # argument is converted to seconds and assigned to the slow_time variable
+            test_set_of_movements(slow_time=slow_time)  # call to the function that holds the predefined set of movements
+            
+        else:     # case the Cubotino_P_servos.py has been launched without 'slow_t' argument
+            test_set_of_movements()           # call to the function that holds the predefined set of movements
     # #############################################################################################
         
