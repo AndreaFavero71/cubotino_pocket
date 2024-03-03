@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 11 February 2024
+#  Andrea Favero 27 February 2024
 #
 # This script relates to CUBOTino Pocket, a small and simple solver robot for a 2x2x2 Rubik's cube
 # This specific script manages the display, and it's imported by Cubotino_P.py and Cubotino_P_servos.py
@@ -73,9 +73,26 @@ class Display:
             self.disp_h = self.disp.height                            # display height, retrieved by display setting
             disp_img = Image.new('RGB', (self.disp_w, self.disp_h),color=(0, 0, 0))   # display image generation, full black
             self.disp.display(disp_img)                               # image is displayed
-            if not self.display_initialized:                               # case display_initialized is set False
-                print("\nDisplay initialized\n")                        # feedback is printed to the terminal
+            if not self.display_initialized:                          # case display_initialized is set False
+                print("\nDisplay initialized\n")                      # feedback is printed to the terminal
                 self.display_initialized = True                       # display_initialized is set True
+        
+        # loading the CUBOTino logo
+        folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)
+        fname = "Cubotino_P_Logo_265x212_BW.jpg"                      # file name with logo image
+        fname = os.path.join(folder,fname)                            # folder and file name for the logo image
+        if os.path.exists(fname):                                     # case the logo file exists
+            logo = Image.open(fname)                                  # opens the CUBOTino logo image (jpg file)
+            self.logo = logo.resize((self.disp_w, self.disp_h))       # resizes the image to match the display.
+        else:                                                         # case the logo file does not exist
+            print(f"\nNot found {fname}")                             # feedback is printedto terminal
+            print("Cubotino logo image is missed\n")                  # feedback is printedto terminal
+            self.logo = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))  # full black screen as new image
+            logo_text = ImageDraw.Draw(self.logo)                     # image is drawned
+            f1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)  # font and size
+            f2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)  # font and size
+            logo_text.text((10, 44), "CUBOT", font=f1, fill=(255, 255, 255))  # text, font, white color
+            logo_text.text((112, 48), "ino", font=f2, fill=(255, 255, 255))   # text, font, white color
 
 
 
@@ -143,7 +160,7 @@ class Display:
         barLength = w-2*x-4 #135   # lenght of the bar, in pixels
         filledPixels = int( x+gap +(barLength-2*gap)*percent/100)  # bar filling length, as function of the percent
         disp_draw.rectangle((x, y, x+barLength, y+barWidth), outline="white", fill=(0,0,0))      # outer bar border
-        disp_draw.rectangle((x+gap, y+gap, filledPixels , y+barWidth-gap), fill=(255,255,255)) # bar filling
+        disp_draw.rectangle((x+gap, y+gap, filledPixels, y+barWidth-gap), fill=(255,255,255)) # bar filling
         
         self.disp.display(disp_img) # image is plotted to the display
 
@@ -152,21 +169,18 @@ class Display:
 
     def show_cubotino(self, built_by='', x=25, fs=22):
         """ Shows the Cubotino logo on the display."""
-                
-        image = Image.open("Cubotino_P_Logo_265x212_BW.jpg")       # opens the CUBOTino logo image (jpg file)
-        image = image.resize((self.disp_w, self.disp_h))           # resizes the image to match the display.
         
         if built_by != '': 
-            disp_draw = ImageDraw.Draw(image)                      # image is plotted to display
+            disp_draw = ImageDraw.Draw(self.logo)                      # logo is plotted to display
             font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)  # font1
-            disp_draw.text((15, 10), "Andrea FAVERO's", font=font1, fill=(0, 0, 255))  # first row text test
+            disp_draw.text((15, 10), "Andrea FAVERO's", font=font1, fill=(0, 0, 255)) # first row text test
             
             font2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 10)  # font1
             disp_draw.text((60, 85), "Built by", font=font2, fill=(255, 255, 255))    # second row text test
             
             font3 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)  # font1
-            disp_draw.text((x, 106), built_by, font=font3, fill=(255, 0, 0))              # third row text test
-        self.disp.display(image)                                   # draws the image on the display hardware.
+            disp_draw.text((x, 106), built_by, font=font3, fill=(255, 0, 0))          # third row text test
+        self.disp.display(self.logo)                                   # draws the logo on the display hardware.
 
 
 
@@ -351,7 +365,7 @@ display = Display()
 
 if __name__ == "__main__":
     """the main function can be used to test the display. """
-    
+         
     display.test1_display()
     display.test2_display()
     display.set_backlight(0)

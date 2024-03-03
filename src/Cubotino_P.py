@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero, 13 February 2024
+#  Andrea Favero, 03 March 2024
 #
 #  This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 #  CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -13,7 +13,7 @@
 #
 #  This is the core script, that interracts with a few other files.
 #  Many functions of this code have been developed on 2021, for my first robot (https://youtu.be/oYRXe4NyJqs).
-#
+#a
 #  The cube status is detected via a camera system (PiCamera) and OpenCV .
 #  Kociemba solver is used for the optimal solution (https://github.com/hkociemba/Rubiks2x2x2-OptimalSolver)
 #  Credits to Mr. Kociemba for his great job !
@@ -28,7 +28,7 @@
 
 
 # __version__ variable
-version = '1.1 (13 Feb 2024)'
+version = '1.4 (03 March 2024)'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -243,12 +243,17 @@ def import_libraries():
     import numpy as np                                    # data array management
     import math                                           # math package
     import time                                           # time package
-    import cv2                                            # computer vision package
     import os                                             # os is imported to ensure the file presence check/make
     
+
+    disp.show_on_display('LOADING', 'openCV', fs1=24, fs2=26)  # feedback is printed to the display
+    print("Loading solver:")                              # feedback is printed to the terminal
+    disp.set_backlight(1)                                 # display backlight is turned on, in case it wasn't
+    import cv2                                            # computer vision package
     print(f'CV2 version: {cv2.__version__}')              # print to terminal the cv2 version
+    disp.set_backlight(0)                                 # display backlight is turned off
     
-    # Up to here Cubotino logo is shown on display
+
     disp.show_on_display('LOADING', 'SOLVER', fs1=24, fs2=27)  # feedback is printed to the display
     print("Loading solver:")                              # feedback is printed to the terminal
     disp.set_backlight(1)                                 # display backlight is turned on, in case it wasn't
@@ -3799,7 +3804,7 @@ def cube_facelets_permutation(cube_status, move_type, direction):
 
 
 def plot_animation(wait, ref_colors_BGR, cube_status, startup=False, kill=False):
-    """ Based on the detected cube status, a sketch of the cube is plot with bright colors on the pictures collage."""
+    """ Based on the detected cube status, a sketch of the cube is plot with bright colors on the screen."""
 
     if startup:
         global plot_colors_a, sketch_a, frame_a, start_points_a, inner_points_a, x_start_a, y_start_a, d_a
@@ -3808,15 +3813,11 @@ def plot_animation(wait, ref_colors_BGR, cube_status, startup=False, kill=False)
         plot_colors_a = {'U':(ref_colors_BGR[0]), 'R':(ref_colors_BGR[1]), 'F':(ref_colors_BGR[2]),
                          'D':(ref_colors_BGR[3]), 'L':(ref_colors_BGR[4]), 'B':(ref_colors_BGR[5])}
         
-        # BGR colors for the facelets plot
-#         plot_colors_a = {'U':(255, 255, 255), 'R':(29, 32, 185), 'F':(35, 144, 0),
-#                          'D':(50, 255, 255), 'L':(0, 128, 255), 'B':(100, 65, 0)}
-        
-        sketch_a = np.zeros([350, 450, 3],dtype=np.uint8) # empty array
-        sketch_a.fill(230)                          # array is filled with light gray
+        d_a = 80                                    # edge lenght for each facelet reppresentation
         x_start_a = 20                              # x coordinate origin for the sketch
         y_start_a = 20                              # y coordinate origin for the sketch
-        d_a = 50                                    # edge lenght for each facelet reppresentation
+        sketch_a = np.zeros([6*d_a + 2*y_start_a, 8*d_a + 2*x_start_a, 3],dtype=np.uint8)  # empty array
+        sketch_a.fill(230)                          # array is filled with light gray
         
         _, facelets_start_a = cube_sketch_coordinates(x_start_a, y_start_a, d_a)  # dict with the top-left coordinates for each of the 24 facelets
         
@@ -3884,29 +3885,39 @@ def animation(screen, ref_colors_BGR, cube_status_string, robot_moves):
     frames = len(csa)                               # len(csa) defines the frames quantity
     
     if animation_activated:                         # case animation_activated is set True
-        for i in range(frames):                     # iteration over the frames quantity
-            if i == 0:                              # case of the first frame
-                disp.plot_status(csa[i], ref_colors_BGR, startup=True)  # csa is plot to display, after setting the display up
-                time.sleep(2)                       # sleep time to let visible the cube status on display
-            else:                                   # case from the 2nd to the last frames
-                disp.plot_status(csa[i], ref_colors_BGR)  # csa is plot to display
-                time.sleep(0.5)                     # (smaller) sleep time to let visible the cube status on display
-        time.sleep(3)                               # additional sleep time at the end
+        if not screen:                              # case scrren variable is set false (no screen connected)
+            t1 = 2.0                                # t1 in s (plot time for initial and final cube status on the sketch)
+            t2 = 0.5                                # t2 in s (plot time for cube status while moving the cube)
+            for i in range(frames):                 # iteration over the frames quantity
+                if robot_stop:                      # case there is a request to stop the robot
+                    break                           # for loop is interrupted
+                if i == 0 and not robot_stop:       # case of the first frame
+                    disp.plot_status(csa[i], ref_colors_BGR, startup=True)  # csa is plot to display, after setting the display up
+                    for i in range(10):             # iteration for 10 times
+                        time.sleep(t1/10)           # additional sleep time at the end
+                        if robot_stop:              # case there is a request to stop the robot
+                            break                   # for loop is interrupted
+                elif i > 0 and not robot_stop:      # case from the 2nd to the last frames
+                    disp.plot_status(csa[i], ref_colors_BGR)  # csa is plot to display
+                    time.sleep(t2/5)                # (smaller) sleep time to let visible the cube status on display          
+            for i in range(10):                     # iteration for 10 times
+                time.sleep(t1/10)                   # additional sleep time at the end
+                if robot_stop:                      # case there is a request to stop the robot
+                    break                           # for loop is interrupted
     
-    if screen:                                      # case screen variable is set True
-        t1 = 3000                                   # t1 in ms (plot time for initial and final cube status on the sketch)
-        t2 = 500                                    # t2 in ms(plot time for cube status while moving the cube)
-        for i in range(frames):                     # iteration over the frames quantity
-            if i == 0:                              # case of the first frame
-                show_ms = t1                        # sketch showing time as per t1
-                plot_animation(show_ms, ref_colors_BGR, csa[i], startup=True)  # initial cube status is plot to the screen
-            elif i< frames-1:                       # case from the 2nd to the last but frames
-                show_ms = t2                        # sketch showing time as per t1
-                plot_animation(show_ms, ref_colors_BGR, csa[i])  # initial cube status is plot to the screen
-            if i == frames-1:                       # case for the last frames (the new if serves the case of 1 frames)
-                show_ms = t1                        # sketch showing time as per t1
-                # the final cube status is plot to the screen, with kill instruction
-                plot_animation(show_ms, ref_colors_BGR, csa[i], kill=True)
+        elif screen:                                # case screen variable is set True
+            t1 = 3000                               # t1 in ms (plot time for initial and final cube status on the sketch)
+            t2 = 300                                # t2 in ms(plot time for cube status while moving the cube)
+            for i in range(frames):                 # iteration over the frames quantity
+                if robot_stop:                      # case there is a request to stop the robot
+                    break                           # for loop is interrupted
+                if i == 0 and not robot_stop:       # case of the first frame
+                    plot_animation(t1, ref_colors_BGR, csa[i], startup=True)  # initial cube status is plot to the screen
+                elif i< frames-1 and not robot_stop:  # case from the 2nd to the last but frames
+                    plot_animation(t2, ref_colors_BGR, csa[i])  # initial cube status is plot to the screen
+                if i == frames-1 and not robot_stop:  # case for the last frames (the new if serves the case of 1 frames)
+                    # the final cube status is plot to the screen, with kill instruction
+                    plot_animation(t1, ref_colors_BGR, csa[i], kill=True)
 
 
 
