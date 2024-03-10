@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 27 February 2024
+#  Andrea Favero 10 March 2024
 #
 # This script relates to CUBOTino Pocket, a small and simple solver robot for a 2x2x2 Rubik's cube
 # This specific script manages the display, and it's imported by Cubotino_P.py and Cubotino_P_servos.py
@@ -11,13 +11,11 @@
 #############################################################################################################
 """
 
-
+from Cubotino_P_settings_manager import settings as settings   # custom library managing the settings from<>to the settings files
+from Cubotino_P_pigpiod import pigpiod as pigpiod # start the pigpiod server
 from PIL import Image, ImageDraw, ImageFont  # classes from PIL for image manipulation
 import ST7735                                # library for the TFT display with ST7735 driver
-import os.path, pathlib, json                # library for the json parameter parsing for the display
-from getmac import get_mac_address           # library to get the device MAC ddress
-from get_macs_AF import get_macs_AF          # import the get_macs_AF function
-from Cubotino_P_pigpiod import pigpiod as pigpiod # start the pigpiod server
+import os.path, pathlib                      # library for path management
 
 
 class Display:
@@ -27,35 +25,19 @@ class Display:
             In my (AF) case was necessary to play with offset and display dimensions (pixels) to get an acceptable result.
             For a faster display init: Reduce the time.sleep to 0.1 (3 times, iso 0.5) at reset at __init__ of ST7735 module."""
             
-        
         if not self.display_initialized:
-            # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac check
-            macs_AF = get_macs_AF()                                   # mac addresses of AF bots are retrieved
-            folder = pathlib.Path().resolve()                         # active folder (should be home/pi/cube)  
-            eth_mac = get_mac_address().lower()                       # mac address is retrieved
-            fname = 'Cubotino_P_settings.txt'                         # file name with settings for the display
-            if eth_mac in macs_AF:                                    # case the script is running on AF (Andrea Favero) robot
-                pos = macs_AF.index(eth_mac)                          # mac address row position in macs_AF.txt file
-                fname = self.get_fname_AF(fname, pos)                 # AF robot settings file name (do not use these at the start)
-            else:                                                     # case the script is not running on AF (Andrea Favero) robot
-                fname = os.path.join(folder,fname)                    # folder and file name for the settings, to be tuned
-            self.display_settings = False
-            if os.path.exists(fname):                                 # case the settings file exists
-                with open(fname, "r") as f:                           # settings file is opened in reading mode
-                    settings = json.load(f)                           # json file is parsed to a local dict variable
-                try:
-                    self.disp_width = int(settings['disp_width'])     # display width, in pixels
-                    self.disp_height = int(settings['disp_height'])   # display height, in pixels
-                    self.disp_offsetL = int(settings['disp_offsetL']) # Display offset on width, in pixels, Left if negative
-                    self.disp_offsetT = int(settings['disp_offsetT']) # Display offset on height, in pixels, Top if negative
-                    self.built_by = str(settings['built_by'])         # maker's name to add on the Cubotino logo
-                    self.built_by_x = int(settings['built_by_x'])     # x coordinate for maker's name on display
-                    self.built_by_fs = int(settings['built_by_fs'])   # font size for the maker's name on display
-                    self.display_settings = True                      # display_settings is set True
-                except:
-                    print('Error on converting imported parameters to int') # feedback is printed to the terminal
-            else:                                                     # case the settings file does not exists, or name differs
-                print('Could not find the file: ', fname)             # feedback is printed to the terminal 
+            s = settings.get_settings()                               # settings are retrieved from the settings Class
+            self.disp_width = int(s['disp_width'])                    # display width, in pixels
+            self.disp_height = int(s['disp_height'])                  # display height, in pixels
+            self.disp_offsetL = int(s['disp_offsetL'])                # Display offset on width, in pixels, Left if negative
+            self.disp_offsetT = int(s['disp_offsetT'])                # Display offset on height, in pixels, Top if negative
+            self.built_by = str(s['built_by'])                        # maker's name to add on the Cubotino logo
+            self.built_by_x = int(s['built_by_x'])                    # x coordinate for maker's name on display
+            self.built_by_fs = int(s['built_by_fs'])                  # font size for the maker's name on display
+            self.display_settings = True                              # display_settings is set True
+
+        if not self.display_settings:                                 # case display_settings is still False
+            print("Error on loading the display parameters at Cubotino_P_display")
         
         if self.display_settings:
             self.disp = ST7735.ST7735(port=0, cs=0,                   # SPI and Chip Selection                  

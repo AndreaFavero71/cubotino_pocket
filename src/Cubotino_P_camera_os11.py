@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 26 January 2024
+#  Andrea Favero 10 March 2024
 #
 # This script relates to CUBOTino Pocket, a very small and simple Rubik's cube solver robot 3D printed
 # CUBOTino autonomous is the CUBOTino versions for the Rubik's cube 2x2x2.
@@ -13,13 +13,10 @@
 #############################################################################################################
 """
 
-
+from Cubotino_P_settings_manager import settings as settings  # settings manager Class
 from picamera2 import Picamera2        # Raspberry Pi specific package for the camera, since Raspberry Pi OS 11
-from libcamera import controls
-import os.path, pathlib, json          # library for the json parameter parsing for the display
-from getmac import get_mac_address     # library to get the device MAC ddress
-from get_macs_AF import get_macs_AF    # import the get_macs_AF function
-macs_AF = get_macs_AF()                # mac addresses of AF bots are retrieved
+from libcamera import controls         # library for some pf the camera settings
+import pathlib                         # library for file nad folder management
 import time
 
 
@@ -27,29 +24,14 @@ class Camera:
     
     def __init__(self):
         """ Imports and set the picamera (V1.3)"""
-        print("\nLoading camera parameters")
         
-        # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac check
-        fname = 'Cubotino_P_settings.txt'                             # fname for the text file to retrieve settings
-        folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address()                                   # mac address is retrieved
-        if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)                              # return the mac addreess position in the tupple
-            fname = self.get_fname_AF(fname, pos)                     # generates the AF filename
-        else:                                                         # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder, fname)                       # folder and file name for the settings, to be tuned
-        if os.path.exists(fname):                                     # case the settings file exists
-            with open(fname, "r") as f:                               # settings file is opened in reading mode
-                settings = json.load(f)                               # json file is parsed to a local dict variable
-            try:                                                      # tentative
-                camera_width_res = int(settings['camera_width_res'])  # Picamera resolution on width 
-                camera_height_res = int(settings['camera_hight_res']) # Picamera resolution on heigh
-                self.kl = float(settings['kl'])                       # coff. for PiCamera stability acceptance
-                self.expo_shift = float(settings['expo_shift'])            # Picamera shift on exposure value
-            except:   # exception will be raised if json keys differs, or parameters cannot be converted to int/float
-                print('error on converting the imported parameters to int, float or string')   # feedback is printed to the terminal    
-        else:                                                         # case the settings file does not exists, or name differs
-            print(f'could not find {fname}')                          # feedback is printed to the terminal
+        print("\nLoading camera parameters")
+        sett = settings.get_settings()                   # settings are retrieved from the settings Class
+        camera_width_res = sett['camera_width_res']      # Picamera resolution on width 
+        camera_height_res = sett['camera_hight_res']     # Picamera resolution on heigh
+        self.kl = sett['kl']                             # coff. for PiCamera stability acceptance
+        self.expo_shift = sett['expo_shift']             # Picamera shift on exposure value
+  
             
         print("Setting up the camera\n")                              # feedback is printed to the terminal
         self.width = camera_width_res                                 # image width
@@ -64,7 +46,7 @@ class Camera:
         time.sleep(1)
         self.cam.set_controls({"ExposureValue": self.expo_shift})     # exposition target is shifted by expo_shift value (range from -8 to 8)
         self.cam.start()                                              # camera (object) is started
-        print("\nThe Camera is set\n")                                # feedback is printed to the terminal
+        print()                                                       # an empty line is printed for separation
          
     
     def set_resolution(self, w, h):
@@ -134,7 +116,7 @@ class Camera:
     
     
     def set_gains(self, debug, a_gain, d_gain, awb_gains):
-        # d_gain is not used (maintained for compatibiity with Cubotino_T_camera_os10 version)
+        # d_gain is not used (maintained for compatibiity with Cubotino_P_camera_os10 version)
         self.cam.stop()
         self.cam.set_controls({"AnalogueGain":a_gain, "ColourGains":awb_gains})
         self.cam.start()
