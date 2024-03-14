@@ -852,7 +852,7 @@ def enable_widgets(parent, relief):
 
 def show_window(window, startup=False):
     """Function to bring to the front the window in argument."""
-    global servoWindow_ontop
+    global servoWindow_ontop, t_servo_pos
     if window==servoWindow:                    # case the request is to show the servo settings windows
         if not startup:                        # case startup is set false (not at the start)
             try:                               # tentative approach
