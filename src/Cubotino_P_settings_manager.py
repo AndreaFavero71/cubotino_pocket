@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 10 March 2024
+#  Andrea Favero 14 March 2024
 #
 # This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 # CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -330,6 +330,7 @@ class Settings:
                 print('Copy of settings parameter is saved as backup at: ', backup_fname)  # feedback is printed to the terminal
             
             f.write(json.dumps(data, indent=0))                  # content of the setting file is saved in another file, as backup
+            f.truncate()                       # truncates the file (prevents older characters at file-end, if new content is shorter)
         
         if "servo" in fname:                                     # case fname contains 'servo'
             self.servo_s = self.parse_servos_settings(data)      # servos settings datatypes are parsed
