@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 10 March 2024
+#  Andrea Favero 29 March 2024
 #
 # This script relates to CUBOTino Pocket, a very small and simple Rubik's cube solver robot 3D printed
 # CUBOTino autonomous is the CUBOTino versions for the Rubik's cube 2x2x2.
@@ -16,7 +16,6 @@
 from Cubotino_P_settings_manager import settings as settings  # settings manager Class
 from picamera2 import Picamera2        # Raspberry Pi specific package for the camera, since Raspberry Pi OS 11
 from libcamera import controls         # library for some pf the camera settings
-import pathlib                         # library for file nad folder management
 import time
 
 

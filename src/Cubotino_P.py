@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero, 10 March 2024
+#  Andrea Favero, 29 March 2024
 #
 #  This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 #  CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -13,22 +13,22 @@
 #
 #  This is the core script, that interracts with a few other files.
 #  Many functions of this code have been developed on 2021, for my first robot (https://youtu.be/oYRXe4NyJqs).
-#a
+#
 #  The cube status is detected via a camera system (PiCamera) and OpenCV .
 #  Kociemba solver is used for the optimal solution (https://github.com/hkociemba/Rubiks2x2x2-OptimalSolver)
-#  Credits to Mr. Kociemba for his great job !
+#  Credits to Mr. Kociemba for his great job, and helping me to modify the solver for optimal quarter turn.
 #  Search for CUBOTino on www.instructables.com, to find more info about this robot family.
 #
 #  Developped on:
-#  - Raspberry Pi Zero2W and Raspberry Pi ZeroW
-#  - Raspberry Pi OS Buster and Bulleys, with desktop environment
+#  - Raspberry Pi Zero2W
+#  - Raspberry Pi OS Bulleys, with desktop environment
 #
 #############################################################################################################
 """
 
 
 # __version__ variable
-version = '2.0 (10 March 2024)'
+version = '2.1 (29 March 2024)'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -508,7 +508,7 @@ def robot_camera_setting(debug, os_version, camera):
     
     t_stable = round(time.time()-t_start,1)            # time to get the camera stable on this cube face
     
-    if debug:
+    if debug:                                          # case debug is set True
         print('\nPiCamera warmup function:')           # feedback is printed to the terminal
         print('analog_gain_list',a_gain_list)          # feedback is printed to the terminal
         print('digital_gain_list',d_gain_list)         # feedback is printed to the terminal
@@ -561,35 +561,25 @@ def robot_consistent_camera_images(debug, os_version, camera, start_time):
     exp_list=[]                                         # list to store the Picamera exposure time, during pre-scan period
     stable_camera_list=[]                               # list to store the Picamera stability reach within timeout
 
-    PiCamera_param = robot_camera_setting(debug, os_version, camera)
-    a_gain_list.append(PiCamera_param[0])
-    d_gain_list.append(PiCamera_param[1])
-    awb_blue_list.append(PiCamera_param[2][0])
-    awb_red_list.append(PiCamera_param[2][1])
-    exp_list.append(PiCamera_param[3])
-    stable_camera_list.append(PiCamera_param[4])
-    
-    if debug:                                           # case debug variable is set True
-        print("\nCamera settings (in Auto mode) at face 1:")  # feedback is printed to the terminal
-        print(PiCamera_param)                           # feedback is printed to the terminal
-        print()
-
     # PiCamera is inquired on 4 cube sides reachable via a simple cube flip, to later fix an average parameters
-    for i in range(2,5,1):                              # iterate over the next 3 faces reachable via a single cube flip    
-        robot_to_cube_side(1,cam_led_bright)            # flipping the cube, to reach the next side 
+    for i in (1,2,3,4):                                 # iterate over 4 faces reachable via a single cube flip    
+        if i > 1:                                       # case i (face) is not the first
+            robot_to_cube_side(1,cam_led_bright)        # flipping the cube, to reach the next side 
 
-        PiCamera_param = robot_camera_setting(debug, os_version, camera)
-        a_gain_list.append(PiCamera_param[0])
-        d_gain_list.append(PiCamera_param[1])
-        awb_blue_list.append(PiCamera_param[2][0])
-        awb_red_list.append(PiCamera_param[2][1])
-        exp_list.append(PiCamera_param[3])
-        stable_camera_list.append(PiCamera_param[4])
-    
-        if debug:                                           # case debug variable is set True
+        PiCamera_param = robot_camera_setting(debug, os_version, camera)  # camera parameter are returned
+        a_gain_list.append(PiCamera_param[0])           # analog gain is added to a_gain_list
+        d_gain_list.append(PiCamera_param[1])           # digital gain is added to d_gain_list
+        awb_blue_list.append(PiCamera_param[2][0])      # awb blue is added to awb_blue_list
+        awb_red_list.append(PiCamera_param[2][1])       # awb red is added to awb_red_list
+        exp_list.append(PiCamera_param[3])              # exposure time is added to exp_list
+        stable_camera_list.append(PiCamera_param[4])    # boolean stable_camera is added to stable_camera_list
+        
+        if debug:                                       # case debug variable is set True
             print(f"\nCamera settings (in Auto mode) at face {i}:")  # feedback is printed to the terminal
-            print(PiCamera_param)                           # feedback is printed to the terminal
-            print()
+            print(PiCamera_param)                       # feedback is printed to the terminal
+            print()                                     # print an empty line
+            if i == 4:                                  # case i (face) equals four
+                print("\n"*3)                           # prints 3 empty lines
     
     # setting the camera in manual mode, for consistent images when scanning
     a_gain = float(sum(a_gain_list)/len(a_gain_list))   # average a_gain is calculated and assigned
@@ -610,16 +600,16 @@ def robot_consistent_camera_images(debug, os_version, camera, start_time):
         print(f'Camera setting: Fixed gains and shutter time for cube  scanning, in {round(time.time()-start_time,1)} secs')# feedback is printed to the terminal
     
     if debug:                                           # case debug variable is set True
-        print('\nPiCamera warmup function:')            # feedback is printed to the terminal
-        print('\nexposure time on UBDF faces : ', exp_list)  # feedback is printed to the terminal
-        print('\naverage exposure time: ', int(sum(exp_list)/len(exp_list)), 'micro secs') # feedback is printed to the terminal
-        print('shutter_time set by PiCamera: ', camera.get_exposure(), ' micro secs')  # feedback is printed to the terminal
-        print('camera stable within timeout', stable_camera_list)   # feedback is printed to the terminal
-        print('\nPiCamera parameters, for consistent images, are set to:')    # feedback is printed to the terminal
-        print('analog_gain_list',a_gain_list)           # feedback is printed to the terminal
-        print('digital_gain_list',d_gain_list)          # feedback is printed to the terminal
-        print('awb_blue_list',awb_blue_list)            # feedback is printed to the terminal
-        print('awb_red_list',awb_red_list)              # feedback is printed to the terminal
+        print('\n\nExposure time on UBDF faces : ', exp_list)  # feedback is printed to the terminal
+        print('Average exposure time: ', int(sum(exp_list)/len(exp_list)), 'micro secs') # feedback is printed to the terminal
+        print('Shutter_time set by PiCamera: ', camera.get_exposure(), ' micro secs')  # feedback is printed to the terminal
+        print('Camera stable within timeout', stable_camera_list)   # feedback is printed to the terminal
+        print('\nPiCamera parameters, for consistent images, are set to:')  # feedback is printed to the terminal
+        print('Analog_gain_list',a_gain_list)           # feedback is printed to the terminal
+        print('Digital_gain_list',d_gain_list)          # feedback is printed to the terminal
+        print('Awb_blue_list',awb_blue_list)            # feedback is printed to the terminal
+        print('Awb_red_list',awb_red_list)              # feedback is printed to the terminal
+        print("\n"*4)                                   # prints four empty lines
 
     disp.clean_display()                                # cleans the display
     robot_to_cube_side(1,cam_led_bright)                # flipping the cube, to reach the 1st face for the scanning process
@@ -973,9 +963,7 @@ def read_facelets(frame, w, h):
         prev_side=side                            # current side is assigned to previous side variable
 
     image, w, h = edge_analysis(frame, w, h)      # image edges analysis is applied to the frame
-    
     (contours, hierarchy) = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # contours are searched on the image
-#     (contours, hierarchy) = cv2.findContours(image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # contours are searched on the image copy
     
     return (contours, hierarchy)                  # contours are returned
 
@@ -1240,7 +1228,7 @@ def get_facelets_fcs(facelets, frame):
         Dummy contours are made, to visualize them on screen, or saved picture_collage, when debug is true."""
     
     if debug:
-        print("\nCalled the fix_coordinate_approach")
+        print("Called the fix_coordinate_approach")
         
     c = f_coordinates                          # f_coordinates assigned to a local very short variable name
     
@@ -1329,7 +1317,7 @@ def area_deviation(data, min_area, max_area):
 
 def order_4points(pts, w, h):
     """ Based on: https://www.pyimagesearch.com/2016/03/21/ordering-coordinates-clockwise-with-python-and-opencv/
-    Modified to only use Numby instead also Scipy library.
+    Modified to only use Numby instead of Scipy library.
     This function orders the 4 vertex of (simplified) contours, so that the first one is top left (CW order).
     Argument is a contour.
     Function returns a contour with coordinates ordered as per below sketch.
@@ -1578,23 +1566,18 @@ def remove_old_data(fname):
 
 
 
-def cube_colors_clusters(URFDLB_facelets_BGR_mean):
+def cube_colors_clusters(color, vectors, clusters):
     """ This function is used to divide the facelets' colors in 6 clusters.
-        The argumnent is the (mean) BGR values for the 24 facelets detected on the cube.
+        The argumnent is the mean color values (BR or HSV) for the 24 facelets detected on the cube.
         The funtion returns a numpy array with the 6 dominant colors. """
     
-    facelets_BGR = np.array(URFDLB_facelets_BGR_mean)         # facelets BGR_mean colors changed to array
-    reshaped_facelets_BGR = facelets_BGR.reshape((-1,3))      # facelets BGR_mean colors array to single vector
-    reshaped_facelets_BGR = np.float32(reshaped_facelets_BGR) # facelets BGR_mean colors array to float 32 bit
+    facelets_color = np.array(color)                          # facelets BGR_mean colors changed to array
+    reshaped_facelets = facelets_color.reshape((-1,vectors))  # facelets BGR_mean colors array to single vector
+    reshaped_facelets = np.float32(reshaped_facelets)         # facelets BGR_mean colors array to float 32 bit
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)  # escape criteria for clustering (epsilon and max iterations)
-    clusters = 6                                              # number of clusters (obviously the 6 colors of the cube)
-    ret, label, ref_colors_BGR = cv2.kmeans(reshaped_facelets_BGR, clusters, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)  # colors clustering
-    ref_colors_BGR = np.uint8(ref_colors_BGR).tolist()        # clustered colors convertered to 8bit and assigned to a list
-    
-    if debug:                                                 # case debug variable is set True
-        print(f'\nReference colors (BGR): {ref_colors_BGR}')  # feedback is printed to the terminal
-        
-    return ref_colors_BGR
+    clusters = clusters                                       # number of clusters (obviously the 6 colors of the cube)
+    ret, label, ref_colors = cv2.kmeans(reshaped_facelets, clusters, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)  # colors clustering
+    return label, ref_colors
 
 
 
@@ -1602,7 +1585,7 @@ def cube_colors_clusters(URFDLB_facelets_BGR_mean):
 
 
 
-def cube_colors_interpr(BGR_detected, ref_colors_BGR):
+def cube_colors_interpr_BGR(BGR_detected, ref_colors_BGR):
     """ This function is used to define the cube status.
     The basic principle is to associate facelets to the reference color having the minimum color distance.
     From the mean BGR color, detected per each facelet, the euclidean distance is calculated toward the 6 reference colors.
@@ -1624,11 +1607,11 @@ def cube_colors_interpr(BGR_detected, ref_colors_BGR):
     if debug:                                               # case debug variable is set True
         print(f'\nBGR_detected: {BGR_detected}')            # feedback is printed to the terminal
 
-    # Step2: detected BGR, of the center's facelets, are used as initial reference
-    cube_ref_colors = {'color0':ref_colors_BGR[0], 'color1':ref_colors_BGR[1], 'color2':ref_colors_BGR[2],
-                       'color3':ref_colors_BGR[3], 'color4':ref_colors_BGR[4], 'color5':ref_colors_BGR[5]}
+    # Step2: BGR of the 6 dominat colors, out of the detected 24 facelets, are used as reference
+    cube_ref_colors = {'c0':ref_colors_BGR[0], 'c1':ref_colors_BGR[1], 'c2':ref_colors_BGR[2],
+                       'c3':ref_colors_BGR[3], 'c4':ref_colors_BGR[4], 'c5':ref_colors_BGR[5]}
     
-    # Step3: dictionary with the color distances from the (initial) references
+    # Step3: dictionary with the color distances from the references
     color_distance={}                                             # empty dict to store all the color distances for all the facelets
     cube_ref_colors_lab={}                                        # empty dictionary to store color refences in Lab color space
     for color, BGR in cube_ref_colors.items():                    # iteration over the 6 centers
@@ -1667,7 +1650,7 @@ def cube_colors_interpr(BGR_detected, ref_colors_BGR):
     # Step7: Color interpretation
     cube_status_by_color_distance={}          # dict to store the cube status reppresentation wih the interpreted colors
     distance={}                               # dict to store the color distance during each facelet check
-    full_cube=['color0','color1','color2','color3','color4','color5']*4
+    full_cube=['c0','c1','c2','c3','c4','c5']*4
     for i, value in enumerate(BGR_ordered.values()):        # iteration on the facelet's BGR values ordered by increasing color distance from ref
         B,G,R = value
         lab_meas = rgb2lab([R,G,B])                         # conversion to lab color space (due CIEDE2000 function)
@@ -1693,9 +1676,391 @@ def cube_colors_interpr(BGR_detected, ref_colors_BGR):
         for i in range(24):                                 # iteration over the 24 facelets
             cube_status[i]=cube_status_by_color_distance[key_ordered_by_color_distance.index(i)] # dict with facelet as key and color as value
     else:
-        print("Error in the cube status detection")         # feedback is printed to the terminal
-    
+        if debug:                                           # case debug is set True
+            print()                                         # print an empty line
+            print('#'*55)                                   # print a separation line
+            print("Error in the cube status detection, via BGR color space")  # feedback is printed to the terminal
+            print('#'*55)                                   # print a separation line
+            print()                                         # print an empty line
+        else:                                               # case debug is set False
+            print("\nError in the cube status detection, via BGR color space")  # feedback is printed to the terminal
+        
     return cube_status
+
+
+
+
+
+
+
+def cube_colors_interpr_HSV(HSV_detected):
+    """This function uses on the HSV color space, converted from the avg BGR read on facelets.
+    It determines the colors assigned to all facelets, based on HSV value measured.
+    The argument is a list with 24 entries of the [H,S,V] for the average color detected at the facelets centers.
+    Baseline:  All facelets are evaluated only by their H (Hue) value.
+               Dominant Hue values are used as reference.
+    There is no interpretation of the colors from the Hue values, just clustering.
+    This function returns the interpreted facelet colors, on the URFDLB order.""" 
+    
+    print()                                                 # print an empty line
+    print('#'*65)                                           # print a separation line
+    print('Called the function to get the cube status vis HSV color analysis') # feedback is printed to the terminal
+    print('#'*65)                                           # print a separation line
+    print()                                                 # print an empty line
+
+    if debug:                                               # case debug variable is set True
+        print("\nHSV_detected:", HSV_detected)              # feedbacl is printed to the terminal
+
+    clusters = 6                                            # number of clusters in this analysis type
+    
+    # Step1, generate sone dictionaries
+    Hue = {}                                                # dict to store the Hue value of all facelets
+    S = {}                                                  # dict to store the S (Saturation) value of all facelets
+    V = {}                                                  # dict to store the V (Value)  of all facelets
+    VSdelta={}                                              # dict to store the V-S (value-Saturation) value of all facelets
+    for facelet, hsv in enumerate(HSV_detected):            # Hue, Saturation and Value are retrieved from the HSV dict
+        Hue[facelet] = hsv[0]                               # Hue is assigned to the Hue dict
+        S[facelet] = hsv[1]                                 # Satuartion is assigned to the S dict
+        V[facelet] = hsv[2]                                 # Value is assigned to the V dict
+
+
+
+    # Step2: get the Hue of the 6 dominant colors, out of the detected 24 facelets
+    Hue_detected = list(Hue.values())                       # list the Hue of the detected 24 facelets
+    label, Hue_ref = cube_colors_clusters(Hue_detected, vectors=1, clusters=clusters)  # 6 reference Hue colors, out of the 24 colored facelets
+    Hue_reference = [x[0] for x in np.uint8(Hue_ref).tolist()]  # Hue_ref is converted to int to list and assigned to Hue_reference 
+    if debug:                                               # case debug variable is set True
+        print("\nHue colors:", Hue)                         # feedback is printed to the terminal
+    
+    
+    
+    # Step3: check if clusters have 4 values each
+    label_list = [x[0] for x in label.tolist()]             # list with the clustered labels for the 20 colored facelets
+    if debug:                                               # case debug variable is set True
+        print("\nClusters labels:", label_list)             # feedback is printed to the terminal
+        
+    clustering_ok = True                                    # boolean clustering_ok to track the clustering result
+    max_k = 0                                               # zero is assigned to max_k (largest cluster)
+    for i in range(clusters):                               # iteration over the clusters quantity
+        n = label_list.count(i)                             # occurrences of label(i) is assigned to variable n
+        max_k = max(max_k, n)                               # max_k is updated if a large n is found
+        if n != 4:                                          # case a cluster is not equal to 4 (as it should be when correct)
+            clustering_ok = False                           # clustering_ok is set False
+    
+    hue_range = max(Hue.values()) - min(Hue.values())       # Hue range is calculated
+    if max_k >= 8 or hue_range < 50:                        # case the largest cluster has at least 8 entries or small Hue_range
+        clustering_ok = True  # clustering_ok is set True to enable the alternative analysis while not worth reorganizing the clustering
+
+################### DEBUG #############
+#     clustering_ok = False                                   # uncomment this row to force the call to improve_hue_clustering function
+#######################################
+    
+    if not clustering_ok:                                   # case clustering_ok is set False
+        if debug:                                           # case debug variable is set True
+            print("\nClustering not ok")                    # feedback is printed to the terminal
+
+        label, Hue_reference, Hue_detected = improve_hue_clustering(label, clusters, Hue, Hue_detected)  # call to the fustion to improve hue clustering
+        label_list = [x[0] for x in label.tolist()]         # list with the clustered labels for the 20 colored facelets
+        if debug:                                           # case debug variable is set True
+           print("\nHue_reference:", Hue_reference)         # feedback is printed to the terminal
+        
+        ok_count = 0                                        # ok_count is a counter, set to zero
+        for i in range(clusters):                           # iteration over the 5 clusters
+            if label_list.count(i) != 4:                    # case a cluster is not equal to 4 (as it should be when correct)
+                clustering_ok = False                       # clustering_ok is set False
+                break                                       # for loop is interrupted
+            else:                                           # case a cluster is equal to 4 (as it should be)
+                ok_count += 1                               # ok_count counter is incremented by one
+        if ok_count == clusters:                            # case ok_count equals clusters quantity
+            clustering_ok = True                            # clustering_ok is set True
+            if debug:                                       # case debug variable is set True
+                print("\nClustering ok")                    # feedback is printed to the terminal
+            
+
+    # Step5: Color distance from the dominant Hue, and color-facelets assotiation
+    Hue_ref = {'c0':Hue_reference[0], 'c1':Hue_reference[1], 'c2':Hue_reference[2],
+               'c3':Hue_reference[3], 'c4':Hue_reference[4], 'c5':Hue_reference[5]}   # dict with the reference hue
+    if debug:                                               # case debug variable is set True
+        print("\nHue_ref:", Hue_ref)                        # feedback is printed to the terminal
+    
+    cube_status = {}                                        # dict to store the cube status reppresentation wih the interpreted colors
+    hue_distance = {}                                       # empty dict to store all the color distances for all the facelets
+    facelet=0                                               # facelet index is set to zero
+    for H in Hue_detected:                                  # iteration over the 24 colored facelets
+        for color, H_ref in Hue_ref.items():                # iteration over the reference Hue
+            hue_distance[color] = abs(H-H_ref)              # Hue facelet distance toward the 6 dominat Hue colors
+        color = min(hue_distance, key=hue_distance.get)     # chosen color is the one with min hue_distance from reference 
+        cube_status[facelet] = color                        # dict of cube status wih the interpreted colors  
+        hue_distance.clear()                                # distance dict is cleared for the next facelet
+        facelet+=1                                          # facelet is incremented
+    
+    
+    
+    # Step5: Creating ref_colors_BGR dict for proper cube color reppresentation (cube sketch, animation)
+    ref_colors_BGR = []                                     # empty list for the BGR reference colors 
+    for color, h in Hue_ref.items():                        # iteration over the Hue reference colors
+        facelet, _ = min(Hue.items(), key=lambda x: abs(h - x[1]))  # facelet with the closest Hue (from the Hue dictionary) to the Hue reference
+        s = S[facelet]                                      # retrieve the facelet s (Saturation) from the Saturation dictionary
+        v = V[facelet]                                      # retrieve the facelet v (Value) from the Value dictionary
+        bgr = cv2.cvtColor(np.array([[[h,s,v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR) # BGR color space equilavent of reference hsv
+        ref_colors_BGR.append(bgr[0][0].tolist())           # bgr is converted to list (also int dtype iso int64) and appended to the list
+    
+    
+    
+    # Step6: Check if coherent cube  (all 6 colors appearing 4 times)
+    counter =[0] * 6                                        # list with 6 zeros
+    
+    for c in cube_status.values():                          # iterating over the colors of cube_status
+        if c == 'c0':                                       # case c (color) equals c0
+            counter[0] += 1                                 # counter element, index 0, is increased by one
+        elif c == 'c1':                                     # case c (color) equals c1
+            counter[1] += 1                                 # counter element, index 1, is increased by one
+        elif c == 'c2':                                     # case c (color) equals c2
+            counter[2] += 1                                 # counter element, index 2, is increased by one
+        elif c == 'c3':                                     # case c (color) equals c3
+            counter[3] += 1                                 # counter element, index 3, is increased by one
+        elif c == 'c4':                                     # case c (color) equals c4
+            counter[4] += 1                                 # counter element, index 4, is increased by one
+        elif c == 'c5':                                     # case c (color) equals c5
+            counter[5] += 1                                 # counter element, index 5, is increased by one
+
+    if counter.count(counter[0]) != len(counter):           # case all colors do not appear 4 times
+        if debug:                                           # case debug variable is set True
+            print("\nHSV analysis error, calling an alternative analysys method")  # feedback is printed to the terminal
+        cube_status, ref_colors_BGR = cube_colors_interpr_HSV_02(HSV_detected)  # a different implementation of the HSV analysis is called
+    else:                                                   # case all colors appear 4 times
+        if debug:                                           # case debug variable is set True
+            print("\nCube_status, via HSV analysis:", cube_status)  # feedback is printed to the terminal
+    
+    return cube_status, ref_colors_BGR
+
+
+
+
+
+
+
+def cube_colors_interpr_HSV_02(HSV_detected):
+    """This function uses on the HSV color space, converted from the avg BGR read on facelets.
+    It determines the colors assigned to all facelets, based on HSV value measured.
+    The argument is a list with 24 entries of the [H,S,V] for the average color detected at the facelets centers.
+    Baseline:  White has higest V (Value) and lowest S (Saturation) than the other colors; Used "(V-S)" parameter.
+               Not-white facelets are evaluated only by their H (Hue) value.
+               Dominant Hue values are used as reference.
+    There is no interpretation of the colors from the Hue values, just clustering.
+    This function returns the interpreted facelet colors, on the URFDLB order.""" 
+    
+    print()                                                 # print an empty line
+    print('#'*54)                                           # print a separation line
+    print('Called the alternative function for HSV color analysis') # feedback is printed to the terminal
+    print('#'*54)                                           # print a separation line
+    print()                                                 # print an empty line
+
+    if debug:                                               # case debug variable is set True
+        print("\nHSV_detected:", HSV_detected)              # feedbacl is printed to the terminal
+    
+    clusters = 5                                            # number of clusters in this analysis type
+
+    # Step1, generate sone dictionaries
+    Hue = {}                                                # dict to store the Hue value of all facelets
+    S = {}                                                  # dict to store the S (Saturation) value of all facelets
+    V = {}                                                  # dict to store the V (Value)  of all facelets
+    VSdelta={}                                              # dict to store the V-S (value-Saturation) value of all facelets
+    for facelet, hsv in enumerate(HSV_detected):            # Hue, Saturation and Value are retrieved from the HSV dict
+        Hue[facelet] = hsv[0]                               # Hue is assigned to the Hue dict
+        S[facelet] = hsv[1]                                 # Satuartion is assigned to the S dict
+        V[facelet] = hsv[2]                                 # Value is assigned to the V dict
+        VSdelta[facelet] = int(hsv[2]) - int(hsv[1])        # difference between Value (brightness) and Saturation, for all the facelets
+
+
+
+    # Step2, find the white facelets: White facelets have the largest difference between Value and Saturation (V-S, or VSdelta)
+    # White facelets are removed from the Hue dict, to better analyze the colored facelets
+    
+    # V-S delta value ordered dict, to have the white facelets close to each other
+    VSdelta_ordered={k: v for k, v in sorted(VSdelta.items(), key=lambda item: item[1])}
+    key_ordered_by_VSdelta = [x for x in VSdelta_ordered.keys()]  # list with the key of the (ordered) dict is generated
+    white_facelets_list=key_ordered_by_VSdelta[-4:]         # white facelets have the biggest H-S value, therefore are the last 4
+    if debug:                                               # case debug variable is set True
+        print("key_ordered_by_VSdelta:", key_ordered_by_VSdelta)
+        print("\nWhite_facelets:", white_facelets_list)     # feedback is printed to the terminal
+    for facelet in white_facelets_list:                     # iteration over the facelets having the white facelet
+        del Hue[facelet]                                    # white facelets are removed from the Hue dict
+
+
+
+    # Step3: get the Hue of the 5 dominant colors, out of the detected 20 facelets (4 white facelets are removed)
+    Hue_detected = list(Hue.values())                       # list the Hue of the detected 20 facelets
+    if debug:                                               # case debug variable is set True
+        print("\nHue colors:", Hue)                         # feedback is printed to the terminal
+    label, Hue_ref = cube_colors_clusters(Hue_detected, vectors=1, clusters=clusters)  # five reference Hue colors, out of the 20 colored facelets
+    Hue_reference = [x[0] for x in np.uint8(Hue_ref).tolist()]  # Hue_ref is converted to int to list and assigned to Hue_reference
+    
+    
+    # Step4: check if clusters have 4 values each
+    label_list = [x[0] for x in label.tolist()]             # list with the clustered labels for the 20 colored facelets
+    if debug:                                               # case debug variable is set True
+        print("\nClusters labels:", label_list)             # feedback is printed to the terminal
+
+    clustering_ok = True                                    # boolean clustering_ok to track the clustering result
+    max_k = 0                                               # zero is assigned to max_k (largest cluster)
+    for i in range(clusters):                               # iteration over the clusters quantity
+        n = label_list.count(i)                             # occurrences of label(i) is assigned to variable n
+        max_k = max(max_k, n)                               # max_k is updated if a large n is found
+        if n != 4:                                          # case a cluster is not equal to 4 (as it should be when correct)
+            clustering_ok = False                           # clustering_ok is set False
+    
+    hue_range = max(Hue.values()) - min(Hue.values())       # Hue range is calculated
+    if max_k >= 8 or hue_range < 50:                        # case the largest cluster has at least 8 entries or small Hue_range
+        clustering_ok = True                                # clustering_ok is set True as not worth reorganizing the clustering
+
+################### DEBUG #############
+#     clustering_ok = False                                   # uncomment this row to force the call to improve_hue_clustering function
+#######################################
+    
+    if not clustering_ok:                                   # case clustering_ok is set False
+        if debug:                                           # case debug variable is set True
+            print("\nClustering not ok")                    # feedback is printed to the terminal
+            
+        label, Hue_reference, Hue_detected = improve_hue_clustering(label, clusters, Hue, Hue_detected)  # call to the fustion to improve hue clustering
+        label_list = [x[0] for x in label.tolist()]         # list with the clustered labels for the 20 colored facelets
+        if debug:                                           # case debug variable is set True
+           print("\nHue_reference:", Hue_reference)         # feedback is printed to the terminal
+        
+        ok_count = 0                                        # ok_count is a counter, set to zero
+        for i in range(clusters):                           # iteration over the clusters quantity
+            if label_list.count(i) != 4:                    # case a cluster is not equal to 4 (as it should be when correct)
+                clustering_ok = False                       # clustering_ok is set False
+                break                                       # for loop is interrupted
+            else:                                           # case a cluster is equal to 4 (as it should be)
+                ok_count += 1                               # ok_count counter is incremented by one
+        if ok_count == clusters:                            # case ok_count equals clusters quantity
+            clustering_ok = True                            # clustering_ok is set True
+            if debug:                                       # case debug variable is set True
+                print("\nClustering ok")                    # feedback is printed to the terminal
+            
+
+    # Step5: Color distance from the dominant Hue, and color-facelets assotiation
+    Hue_ref = {'c0':Hue_reference[0], 'c1':Hue_reference[1], 'c2':Hue_reference[2],
+               'c3':Hue_reference[3], 'c4':Hue_reference[4]}   # dict with the reference hue
+    if debug:                                               # case debug variable is set True
+        print("\nHue_ref:", Hue_ref)                        # feedback is printed to the terminal
+    
+    cube_status = {}                                        # dict to store the cube status reppresentation wih the interpreted colors
+    hue_distance = {}                                       # empty dict to store all the color distances for all the facelets
+    facelet=0                                               # facelet index is set to zero
+    for H in Hue_detected:                                  # iteration over the 20 colored facelets
+        while facelet in white_facelets_list:               # case the facelet is a white ones (used while in case of consecutive white)
+            cube_status[facelet]='c5'                       # the sixth color (white) is assigned to the facelet
+            facelet+=1                                      # facelet is incremented
+        for color, H_ref in Hue_ref.items():                # iteration over the reference Hue
+            hue_distance[color] = abs(H-H_ref)              # Hue facelet distance toward the 5 dominat Hue colors
+        color = min(hue_distance, key=hue_distance.get)     # chosen color is the one with min hue_distance from reference 
+        cube_status[facelet] = color                        # dict of cube status wih the interpreted colors  
+        hue_distance.clear()                                # distance dict is cleared for the next facelet
+        facelet+=1                                          # facelet is incremented
+    
+    
+    
+    # Step6: Creating ref_colors_BGR dict for proper cube color reppresentation (cube sketch, animation)
+    ref_colors_BGR = []                                     # empty list for the BGR reference colors 
+    for color, h in Hue_ref.items():                        # iteration over the Hue reference colors
+        facelet, _ = min(Hue.items(), key=lambda x: abs(h - x[1]))  # facelet with the closest Hue (from the Hue dictionary) to the Hue reference
+        s = S[facelet]                                      # retrieve the facelet s (Saturation) from the Saturation dictionary
+        v = V[facelet]                                      # retrieve the facelet v (Value) from the Value dictionary
+        bgr = cv2.cvtColor(np.array([[[h,s,v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR) # BGR color space equilavent of reference hsv
+        ref_colors_BGR.append(bgr[0][0].tolist())           # bgr is converted to list (also int dtype iso int64) and appended to the list
+    
+    # adding the (average) white reference (color5, when it comes to HSV analysis)
+    h,s,v = 0,0,0                                           # h s v are initialized to zero
+    for facelet in white_facelets_list:                     # interation over the list of white facelets
+        hsv = HSV_detected[facelet]                         # retrive the hsv from the white facelet under analysis
+        h += hsv[0]                                         # h is incremented by the facelet h
+        s += hsv[1]                                         # s is incremented by the facelet s
+        v += hsv[2]                                         # v is incremented by the facelet v
+    h,s,v = h // 4, s // 4, v // 4                          # h s v average is calculated
+    bgr = cv2.cvtColor(np.array([[[h,s,v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR) # BGR color space equilavent values for the average white
+    ref_colors_BGR.append(bgr[0][0].tolist())               # avg white bgr is converted to list (also int dtype iso int64) and appended to the list
+    
+  
+    if debug:                                               # case debug variable is set True
+        print("\nCube_status, via HSV analysis:", cube_status)  # feedback is printed to the terminal
+    
+    return cube_status, ref_colors_BGR
+
+
+
+
+
+
+
+def improve_hue_clustering(label, clusters, Hue, Hue_detected):
+    """Function to alter the hue values to have clusters of equal size.
+        The biggest issue is the Hue (range 0-179) overflowing, tipically with the red."""
+    
+    print()                                                 # print an empty line
+    print('#'*48)                                           # print a separation line
+    print('Called the function to modify the Hue clustering') # feedback is printed to the terminal
+    print('#'*48)                                           # print a separation line
+    print()                                                 # print an empty line
+    
+    k,k0,k1,k2,k3,k4,k5 = [],[],[],[],[],[],[]              # empty lists to store the hue of each cluster
+        
+    Hue_sum = 0                                             # Hue_sum is used later to calculate the average Hue value
+    for i in range(len(Hue)):                               # iteration over the list of Hue_detected
+        Hue_sum += Hue_detected[i]                          # Hue_sum is incremented by the Hue under analysis
+        if label[i] == 0:                                   # case the cluster is labeled as 0
+            k0.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 0 (k0)
+        elif label[i] == 1:                                 # case the cluster is labeled as 1
+            k1.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 1 (k1)
+        elif label[i] == 2:                                 # case the cluster is labeled as 2
+            k2.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 2 (k2)
+        elif label[i] == 3:                                 # case the cluster is labeled as 3
+            k3.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 3 (k3)
+        elif label[i] == 4:                                 # case the cluster is labeled as 4
+            k4.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 4 (k4)
+        elif label[i] == 5:                                 # case the cluster is labeled as 5
+            k5.append(Hue_detected[i])                      # the Hue at position i is assigned to the kluster for label 5 (k5)
+    
+    if clusters == 6:                                       # case of 6 clusters (primary HSV analysis)
+        k = [k0,k1,k2,k3,k4,k5]                             # the six lists of clusterized Hue are listed in the k list
+    elif clusters == 5:                                     # case of 5 clusters (alternative HSV analysis)
+        k = [k0,k1,k2,k3,k4]                                # the five lists of clusterized Hue are listed in the k list
+    
+    Hue_avg = Hue_sum / (clusters*4)                        # average Hue is calculated
+    k_elements = [len(x) for x in k]                        # list with the entries of the 5 clusters
+    smallest_k = k[k_elements.index(min(k_elements))]       # Hue of the cluster with fewer entries
+    smallest_k_len = len(smallest_k)                        # number of entries on the smallest cluster list
+    
+    if len(smallest_k) > 0:                                 # case the cluster with fewer entries has at least 1 entry (it should always be the caase)                              
+        Hue_smallest_k = sum(smallest_k)/len(smallest_k)    # average Hue is calculated and assigned to Hue_smallest_k
+    
+    if Hue_smallest_k > Hue_avg:                            # case the average Hue of smallest cluster is > average Hue of the facelets
+        for i in range(4 - smallest_k_len):                 # interation for the missed Hue to bring into the "smallest" cluster
+            facelet = min(Hue, key=Hue.get)                 # search the facelet having the lowest Hue
+            Hue[facelet] = 179                              # assigning the max Hue (179) to that facelet
+            
+    elif Hue_smallest_k <= Hue_avg:                         # case the average Hue of smallest cluster is <= average Hue of the facelets
+        for i in range(4 - smallest_k_len):                 # interation for the missed Hue to bring into the "smallest" cluster
+            facelet = max(Hue, key=Hue.get)                 # search the facelet having the highest Hue
+            Hue[facelet] = 0                                # assigning the min Hue (0) to that facelet
+    
+    Hue_adapted = list(Hue.values())                        # the Hue dict is converted to list and assigned to Hue_adapted
+    label, Hue_ref = cube_colors_clusters(Hue_adapted, vectors=1, clusters=clusters)  # five reference Hue colors out of the 20 facelets, with adapted Hue
+    Hue_reference = [x[0] for x in np.uint8(Hue_ref).tolist()]  # Hue_ref is converted to int to list and assigned to Hue_reference
+    
+    if debug:                                               # case debug variable is set True
+        if clusters == 6:                                   # case of 6 clusters (primary HSV analysis)
+            print("\nk0,k1,k2,k3,k4,k5:",k0,k1,k2,k3,k4,k5) # feedback is printed to the terminal
+        elif clusters == 5:                                 # case of 5 clusters (alternative HSV analysis)
+            print("\nk0,k1,k2,k3,k4:",k0,k1,k2,k3,k4)       # feedback is printed to the terminal
+        print("\nHue_avg:", round(Hue_avg,1))               # feedback is printed to the terminal
+        print("\nSmallest cluster:", smallest_k)            # feedback is printed to the terminal
+        print("\nHue smallest cluster:", Hue_smallest_k)    # feedback is printed to the terminal
+        print("\nHue adapted:", Hue_adapted)                # feedback is printed to the terminal   
+    
+    return label, Hue_reference, Hue_adapted
+
 
 
 
@@ -1885,7 +2250,7 @@ def cube_string(cube_status):
     """ Generates the cube detected status string, compatible with the solver:
     Argument is the cube status generated, where the values are the letters reppresenting the cube faces."""
     
-    cube_in_letters = {'color0':'U', 'color1':'R', 'color2': 'F', 'color3':'D', 'color4':'L', 'color5':'B'}  
+    cube_in_letters = {'c0':'U', 'c1':'R', 'c2': 'F', 'c3':'D', 'c4':'L', 'c5':'B'}  
     string=''
     for color in cube_status.values():         # iteration over the 24 dict facelets values
         string+=str(cube_in_letters[color])    # string is made with the facelet letter on the side
@@ -1915,12 +2280,9 @@ def scrambling_cube():
     cc = cubie.CubieCube()          # cube in cubie reppresentation
     cc.randomize()                  # randomized cube in cubie reppresentation 
     random_cube_string = str(cc.to_facelet_cube())   # randomized cube in facelets string reppresentation
-    print("Random cube status:", random_cube_string) # feedback is printed to the terminal
     
     # Kociemba solver is called to have the solution string
-    solution, solution_Text, robot_moves, total_robot_moves, est_time = cube_solution(random_cube_string, scrambling = True)
-    
-    print("Cube solution:", solution)  # feedback is printed to the terminal
+    solution, solution_Text, robot_moves, total_robot_moves, est_time, tot_s = cube_solution(random_cube_string, scrambling = True)
     
     # dict and string with robot movements, and total movements
     _, robot_moves, total_robot_moves, _ = rm.robot_required_moves(solution, solution_Text, simulation=False, informative=debug)
@@ -2019,10 +2381,21 @@ def cube_solution(cube_string, scrambling=False):
     robot_moves = ''                            # empty string variable to store the ronbot moves
     total_robot_moves = 0                       # totatl robot moves is initialize to zero
     est_time = 0                                # estimated servos time is initialized to zero
+    tot_s = 0                                   # total of solutions analyzed
     
     solutions = sv.solve(cube_string)           # solver is called
     solutions = solutions.splitlines()          # solver return is plit by lines
     solutions = [ x.replace(" ","") for x in solutions]  # empty spaces are removed
+    
+    if solutions[0][:5] == 'Error':             # case the solver has returned 'Error'
+        s = ''                                  # empty string is assigned to s (solution) variable 
+        solution_Text = 'Error'                 # 'Error' is assigned to solution_Text
+        robot_moves = []                        # empty liste is assigned to robot_moves
+        total_robot_moves = 0                   # zero is assigned to total_robot_moves
+        est_time = 0                            # zero is assigned to est_time
+        tot_s = 0                               # zero is assigned to tot_s
+        return s, solution_Text, robot_moves, total_robot_moves, est_time, tot_s
+        
     
     # case the scrambling is set True or the solver returned a single and short solution
     # len(solution[0]<=0 means a URF face rotation, no optimizations possible
@@ -2044,6 +2417,7 @@ def cube_solution(cube_string, scrambling=False):
             for sol in sols:                    # iteration over the alternative solutions generated
                 solutions.append(sol)           # alternative solutions are appended to the original kociemba solutions
         solutions = list(set(solutions))        # duplicated solutions are removed (at the cost of loosing the original order)
+        tot_s = len(solutions)                  # quantity of solutions is assigned to tot_s
 
         if debug:                               # case debug variable is set True
             print(f"\nTotal solutions (solver + robot alternatives) are: {len(solutions)}")  # feedback is printed to the terminal
@@ -2081,21 +2455,23 @@ def cube_solution(cube_string, scrambling=False):
             solution_Text = s[s.find('(')+1:s.find(')')-1]+' moves  '+ s[:s.find('(')] 
             
             if debug:                           # case debug variable is set True
-                print()                         # print an empty line
-                print("List of solutions:", solutions)  # feedback is printed to Terminal
-                print("List of estimated servos time:", estimate_time)   # feedback is printed to Terminal
-                print("Selected solution:", s)  # feedback is printed to Terminal
+                print(f"\nAnalyszed {tot_s} solutions")  # feedback is printed to Terminal
+                print("\nList of solutions:", solutions)  # feedback is printed to Terminal
+                print("\nList of estimated servos time:", estimate_time)   # feedback is printed to Terminal
+                print("\nSelected solution:", s)  # feedback is printed to Terminal
                 print("Selected robot moves:", robot_moves)  # feedback is printed to Terminal
         
        
     elif single_solution:                       # case for scrambling or single very short solutions
         s = solutions[0]                        # the first and only solution is taken from the list
+        tot_s = 1                               # 1 is assigned to tot_s (total quantity of analyzed solutions)
         if debug:                               # case debug variable is set True
             print(f"\nReturned solution from the solver: {s}")  # feedback is printed to the terminal
         s = s[:s.find('(')]                     # solution capture the sequence of manoeuvres
         solution_Text = s[s.find('(')+1:s.find(')')-1]+' moves  '+ s[:s.find('(')]  # manipulated string, used in Cubotino
         if s[:5] =='Error':                     # case solution error (incoherent cube string sent to the solver)
             solution_Text = 'Error'             # 'Error' string is assigned to solution_Text variable
+            print("Error: The cube status is not coherent")  # feedback is printed to the terminal
         
         if solution_Text != 'Error':            # case the solver does not returns errors
             # string with robot movements, and total movements
@@ -2105,7 +2481,7 @@ def cube_solution(cube_string, scrambling=False):
     if debug and solution_Text != 'Error':      # case debug variable is set True
         print("Estimated time for the servos:", est_time, "secs")  # feedback is printed to Terminal
     
-    return s, solution_Text, robot_moves, total_robot_moves, est_time
+    return s, solution_Text, robot_moves, total_robot_moves, est_time, tot_s
 
 
 
@@ -2125,14 +2501,14 @@ def decoration(deco_info):
     faces = deco_info[3]
     ref_colors_BGR = deco_info[4]
     cube_status = deco_info[5]
-    cube_status_string = deco_info[6]                    # 20240116: Not used this yet
+    cube_status_string = deco_info[6]
     URFDLB_facelets_BGR_mean = deco_info[7]
-    color_detection_winner = deco_info[8]                # 20240116: Only one detection algorith implemented so far
+    cdw = deco_info[8]                                   # cdw = color detection winner
     show_time = deco_info[9]
     timestamp = deco_info[10]
 
     # collage function is called
-    collage=faces_collage(faces, ref_colors_BGR, cube_status, color_detection_winner, cube_status_string, \
+    collage=faces_collage(faces, ref_colors_BGR, cube_status, cdw, cube_status_string, \
                           URFDLB_facelets_BGR_mean, font, fontScale, lineType)   # call the function that makes the pictures collage
     
     folder = pathlib.Path().resolve()                    # active folder (should be home/pi/cubotino_pocket)  
@@ -2163,7 +2539,7 @@ def decoration(deco_info):
 
 
 
-def faces_collage(faces, ref_colors_BGR, cube_status, color_detection_winner, cube_status_string, \
+def faces_collage(faces, ref_colors_BGR, cube_status, cdw, cube_status_string, \
                   URFDLB_facelets_BGR_mean, font, fontScale, lineType):
     
     """ This function merges multipe pictures, and it returns the unfolded cube single image.
@@ -2200,7 +2576,6 @@ def faces_collage(faces, ref_colors_BGR, cube_status, color_detection_winner, cu
 
     collage = np.hstack([col1,col2,col3,col4])                     # horizzontal stack of 4 columns of images, to generate the pictures collage
     collage_ratio = collage.shape[1] / collage.shape[0]            # collage ratio (width/height) is calculated for resizing
-    # collage_w=1024                                               # colleage width is fixed for consistent pictures archiving at Rpi
     collage_h=int(collage_w/collage_ratio)                         # colleage heigth is calculated to maintain proportions
 
     if Rpi_ZeroW:                                                  # case Rpi_ZeroW is True (armv6 processor)
@@ -2210,7 +2585,7 @@ def faces_collage(faces, ref_colors_BGR, cube_status, color_detection_winner, cu
     collage = cv2.resize(collage, (collage_w, collage_h), interpolation = interp_method) # resized collage
     
     # adds a sketch with interpreted colors (bright) on the collage
-    plot_interpreted_colors(ref_colors_BGR, cube_status, color_detection_winner, \
+    plot_interpreted_colors(ref_colors_BGR, cube_status, cdw, \
                             cube_status_string, collage, collage_w, collage_h, \
                             font, fontScale, lineType)     # call the function that updates the cube sketch
     return collage
@@ -2221,7 +2596,7 @@ def faces_collage(faces, ref_colors_BGR, cube_status, color_detection_winner, cu
 
 
 
-def cube_sketch_coordinates(x_start, y_start, d):
+def cube_sketch_coordinates(x_start, y_start, d, gap=0):
     """ Generates a list and a dict with the top-left coordinates of each facelet, as per the URFDLB order.
     These coordinates are later used to draw a cube sketch
     The cube sketch (overall a single rectangle with all the facelets in it) starts at x_start, y_start
@@ -2231,12 +2606,15 @@ def cube_sketch_coordinates(x_start, y_start, d):
     
     # the six cube faces are noted from 0 to 5.
     # the top left corner coordinate is defined as function of x_start, y_start and d (=distance)
-    starts={0:(x_start+2*d, y_start),
-            1:(x_start+4*d, y_start+2*d),
-            2:(x_start+2*d, y_start+2*d),
-            3:(x_start+2*d, y_start+4*d),
-            4:(x_start,     y_start+2*d),
-            5:(x_start+6*d, y_start+2*d)}      # dict with the top-left coordinate of each face (not facelets !)
+    
+    g = abs(int(gap))                                      # gap (in pixels) between the cube faces
+    
+    starts={0:(x_start+2*d+g   , y_start),
+            1:(x_start+4*d+2*g , y_start+2*d+g),
+            2:(x_start+2*d+g   , y_start+2*d+g),
+            3:(x_start+2*d+g   , y_start+4*d+2*g),
+            4:(x_start         , y_start+2*d+g),
+            5:(x_start+6*d+3*g , y_start+2*d+g)}  # dict with the top-left coordinate of each face (not facelets !)
     
     for value in starts.values():                          # iteration over the 6 faces
         x_start=value[0]                                   # x coordinate fo the face top left corner
@@ -2248,6 +2626,7 @@ def cube_sketch_coordinates(x_start, y_start, d):
                 square_start_pt.append([x, y])             # x and y coordinate, as list, for the top left vertex of the facelet is appendended
                 x = x+d                                    # x coordinate is increased by square side
                 if j == 1: y = y+d                         # once at the second column the row is incremented
+        
     square_dict = {k:tuple(square_start_pt[k]) for k in range(len(square_start_pt))}  # dictionary is made with tuples of top-left coordinates
     
     return square_start_pt, square_dict   # returns a list and a dict with the the facelets top left square coordinates
@@ -2276,7 +2655,7 @@ def inner_square_points(square_dict,i,edge):
 
 
 
-def plot_interpreted_colors(ref_colors_BGR, cube_status, detect_winner, cube_status_string, \
+def plot_interpreted_colors(ref_colors_BGR, cube_status, cdw, cube_status_string, \
                             collage, collage_w, collage_h, font, fontScale, lineType):
     
     """ Based on the detected cube status, a sketch of the cube is plot with reference colors on the pictures collage."""
@@ -2290,29 +2669,30 @@ def plot_interpreted_colors(ref_colors_BGR, cube_status, detect_winner, cube_sta
     # some text info are placed close to the cube sketch
     cv2.putText(collage, 'Interpreted', (x_start+int(4.5*d), y_start+int(0.6*d)), font, fontScale*1.2,(0,0,0),lineType)
     cv2.putText(collage, 'cube status:', (x_start+int(4.5*d), y_start+int(1.5*d)), font, fontScale*1.2,(0,0,0),lineType)
-    if detect_winner == 'Error':                # case the cube status detection ended with an error
+    
+
+    if cdw == 'Error':                # case the cube status detection winner (cdw) equals Error
         # on the pictures collage a text is added indicating the Error
-        cv2.putText(collage, str(detect_winner), (x_start+int(4.5*d), y_start+int(5.1*d)), font, fontScale*1.2,(0,0,0),lineType)
-        for i in range(24):                     # iteration for 24 times
-            start_point=square_dict[i]          # top-left point coordinate for the facelet square
-            cv2.rectangle(collage, tuple(start_point), (start_point[0]+d, start_point[1]+d), (0, 0, 0), 1) # square black frame
-
+        cv2.putText(collage, str(cdw), (x_start+int(4.5*d), y_start+int(5.1*d)), font, fontScale*1.2,(0,0,0),lineType)
     else:
-        # reference colors assigned to the six faces
-        assigned_colors = {'color0':(ref_colors_BGR[0]), 'color1':(ref_colors_BGR[1]), 'color2':(ref_colors_BGR[2]),
-                       'color3':(ref_colors_BGR[3]), 'color4':(ref_colors_BGR[4]), 'color5':(ref_colors_BGR[5])}
-        
-        for i, color in enumerate(cube_status.values()):                     # iteration over the 24 facelets interpreted colors
-            start_point=square_dict[i]                                       # top-left point coordinate for the facelet square
-            cv2.rectangle(collage, tuple(start_point), (start_point[0]+d, start_point[1]+d), (0, 0, 0), 1) # square black frame
+        # on the pictures collage a text is added indicating the cube detection wimmer (cdw)
+        cv2.putText(collage, str(cdw), (x_start+int(4.5*d), y_start+int(5.1*d)), font, fontScale*1.2,(0,0,0),lineType)
+    
+    # reference colors assigned to the six faces
+    assigned_colors = {'c0':(ref_colors_BGR[0]), 'c1':(ref_colors_BGR[1]), 'c2':(ref_colors_BGR[2]),
+                       'c3':(ref_colors_BGR[3]), 'c4':(ref_colors_BGR[4]), 'c5':(ref_colors_BGR[5])}
+    
+    for i, color in enumerate(cube_status.values()):                     # iteration over the 24 facelets interpreted colors
+        start_point=square_dict[i]                                       # top-left point coordinate for the facelet square
+        cv2.rectangle(collage, tuple(start_point), (start_point[0]+d, start_point[1]+d), (0, 0, 0), 1) # square black frame
 
-            try:
-                B,G,R = assigned_colors[color]                               # BGR values of the assigned colors for the corresponding detected color
-                inner_points=inner_square_points(square_dict,i,d)            # array with the 4 square inner vertex coordinates
-                cv2.fillPoly(collage, pts = [inner_points], color=(B,G,R))   # inner square is colored with bright color of the interpreted one
-            except:                                                          # this case should not exists
-                cv2.putText(collage, cube_status_string[i], (start_point[0]+int(0.3*d), int(start_point[1]+int(0.7*d))),\
-                            font, fontScale*0.9,(0,0,0),lineType)            # facelets side LETTER is printed on the sketch
+        try:
+            B,G,R = assigned_colors[color]                               # BGR values of the assigned colors for the corresponding detected color
+            inner_points=inner_square_points(square_dict,i,d)            # array with the 4 square inner vertex coordinates
+            cv2.fillPoly(collage, pts = [inner_points], color=(B,G,R))   # inner square is colored with bright color of the interpreted one
+        except:                                                          # this case should not exists
+            cv2.putText(collage, cube_status_string[i], (start_point[0]+int(0.3*d), int(start_point[1]+int(0.7*d))),\
+                        font, fontScale*0.9,(0,0,0),lineType)            # facelets side LETTER is printed on the sketch
 
 
 
@@ -2390,7 +2770,7 @@ def average_color(frame, x, y, edge):
 
 
 
-def cube_facelets_colors(frame, facelets, candidates, BGR_mean):
+def cube_facelets_colors(frame, facelets, candidates, BGR_mean, HSV_mean):
     """ Reads the average BGR color on the each facelet of the cube face just detected.
     Draw the contour used on each facelect (eventually the facelet number), to feedback on correct facelet reading/ordering
     The function updates the global variables. """
@@ -2411,21 +2791,11 @@ def cube_facelets_colors(frame, facelets, candidates, BGR_mean):
         contour = facelet.get('contour')                      # contour of the facelet under analysis
         candidates.append(contour)                            # new contour is added to the candidates list
         cm_point=facelet['cx'],facelet['cy']                  # contour center coordinate
-        
-        ############################
-        # Approach 1 that uses the complete contour area to calculate the average color
-#         mask = np.zeros(frame.shape[:2], dtype="uint8")   # mask of zeros is made for the frame shape dimension
-#         cv2.drawContours(mask, [contour], -1, 255, -1)    # mask is applied to vsualize one facelet at the time
-#         bgr=cv2.mean(frame, mask=mask)[:3]                # CV2.mean average the facelet color
-#         BGR_mean.append((int(bgr[0]),int(bgr[1]),int(bgr[2])))  # tuple of bgr components (as int) are appended to the BGR_mean
-        ############################# 
-       
-        #############################
-        # Approach 2 (also used on the 3x3x3) that uses a little area at contour center to calculate the average color
         bgr_mean_sq = average_color(frame, facelet['cx'], facelet['cy'], edge)  # color is averaged with sqr sum of squares
         BGR_mean.append(bgr_mean_sq)                          # average color is assigned to the dict BGR_mean
-        #############################
-        
+        b,g,r = bgr_mean_sq                                   # BGR (avg) components are retrieved
+        hsv = cv2.cvtColor(np.array([[[b,g,r]]], dtype=np.uint8), cv2.COLOR_BGR2HSV)    # HSV color space equilavent values, for the average facelet color
+        HSV_mean.append(list(hsv[0][0]))                      # the (avg) HSV value is stored on a list
         
         if debug:                                             # case debug variable is set True
             # a progressive facelet number, 1 to 4, is placed over the facelets
@@ -2588,7 +2958,7 @@ def robot_to_cube_side(side, cam_led_bright):
 
 
 
-def robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time, scrambling=False):
+def robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time, scrambling=False, cdw=''):
     """This fuction calls the robot servo function to apply the solving movements to the cube; Arguments of this function are:
         - robot_moves, a string with the calculated movements for the robot based on the kociemba solution
         - total_robot_moves value, used to visualize on display a robot moves count-down
@@ -2626,8 +2996,9 @@ def robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time, s
             fs_row1 = 31 if tot_robot_time >=100 else 35       # font size for display first row
             fs_row2 = 28 if robot_solving_time >=100 else 31   # font size for display second row
             disp.show_on_display(f'TOT.: {round(tot_robot_time,1)} s',\
-                            f'SOLV.: {round(robot_solving_time,1)} s',\
-                            x1=10, fs1=18, x2=10, fs2=18)      # time feedback is printed to the display
+                                 f'SOLV.: {round(robot_solving_time,1)} s',\
+                                 r3 = f'via: {cdw}',\
+                                 x1=10, fs1=18, x2=10, fs2=18, x3=10, fs3=13)  # time feedback is printed to the display
             if not screen:                                     # case a screen is not connected
                 time.sleep(7)                                  # 7 secs delay is applied, to let user reading info on screen
             else:                                              # case a screen is connected
@@ -2670,26 +3041,32 @@ def text_font():
 
 
 
-def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, 
-                     URFDLB_facelets_BGR_mean, font, fontScale, lineType, show_time, timestamp,
-                     solution, solution_Text, robot_moves, total_robot_moves, est_time,
-                     color_detection_winner, cube_status_string, BGR_mean, start_time,
-                     camera_ready_time, cube_detect_time, cube_solution_time, slow_time_s,
-                     os_version, fcs):
+def robot_solve_cube(ffixWindPos, screen, frame, faces, ref_colors_BGR, cube_status,
+                     URFDLB_facelets_BGR_mean, URFDLB_facelets_HSV_mean, font, fontScale,
+                     lineType, show_time, timestamp, solution, solution_Text, robot_moves,
+                     total_robot_moves, est_time, cdw, cube_status_string,
+                     BGR_mean, start_time, camera_ready_time, cube_detect_time,
+                     cube_solution_time, slow_time_s, os_version, fcs):
     
     """ Sequence of commands involving the robot, after the cube status detection
     Within this function the robot is called to solve the cube.
-    This function calls many other functions, like a picture collage maker to store the detected images of the cube . """
+    This function calls many other functions, like:
+    1) picture collage maker to store the detected images of the cube,
+    2) data log to a text files,
+    3) and others."""
     
     global robot_stop
 
     if solution_Text != 'Error':                # case the solver has returned an error
         print('Total robot movements: ', total_robot_moves)  # nice information to print at terminal, sometime useful to copy
-
-    if color_detection_winner == 'BGR':         # case the cube status has been positively detected by the BGR color distance method
-        facelets_data=BGR_mean                  # data to be later logged in a text file
-    else:                                       # case of error via the BGR color distance method
-        facelets_data=BGR_mean                  # data to be later logged in a text file (temporary)
+    
+    # cdw = color detection winner
+    if cdw == 'BGR':                            # case the cube status has been positively detected by the BGR color distance method
+        facelets_data=BGR_mean                  # data to be later logged in a text file         
+    elif cdw == 'HSV':                          # case the cube status has been positively detected by the HSV color analysis
+        facelets_data=URFDLB_facelets_HSV_mean  # data to be later logged in a text file
+    else:                                       # case the solver has returned an error
+        facelets_data=BGR_mean, URFDLB_facelets_HSV_mean    # data to be later logged in a text file includes BGR and HSV
     
     if screen:                                  # case screen variable is set True
         try:                                    # tentative approach
@@ -2699,19 +3076,19 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_stat
      
     if not robot_stop:             # case there are no request to stop the robot
         # movements to the robot are finally applied
-        solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
+        solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time, cdw=cdw)
         
-        if solution_Text != 'Error' and not robot_stop:  # case the solver has not returned an error and no stop requests
-            animation(screen, ref_colors_BGR, cube_status_string, robot_moves)    # plot on screen the facelets animation 
+        if solution_Text != 'Error' and len(robot_moves) > 0 and not robot_stop:  # case the solver has not returned an error and no stop requests
+            animation(screen, ref_colors_BGR, cube_status_string, robot_moves)  # plot on screen the facelets animation 
         
         # some relevant info are logged into a text file
-        log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner,
+        log_data(timestamp, facelets_data, cube_status_string, solution, cdw,
                  tot_robot_time, start_time, camera_ready_time, cube_detect_time, cube_solution_time,
                  robot_solving_time, slow_time_s, os_version, fcs)
         
         deco_info = (fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, \
                      cube_status_string, URFDLB_facelets_BGR_mean, \
-                     color_detection_winner, show_time, timestamp) # tuple of variables needed for the decoration function
+                     cdw, show_time, timestamp) # tuple of variables needed for the decoration function
         decoration(deco_info)      # cals the decoration function, that shows (or just saves, is screen=False) cube's faces pictures  
         
     else:                          # case there is a request to stop the robot
@@ -2776,52 +3153,94 @@ def robot_time_to_solution(start_time, start_robot_time, total_robot_moves):
 
 def check_headers(folder, fname):
     """Checks the existing headers of the log file.
+       Change the headers name in case of a correction after the 1st release. 
        In case new headers are added, after the first script release, the new headers are added to the log file.
     """
     
+    # this part changes one heaader name
     with open(fname, 'r') as f:                     # file is opened, to adjust the headers in case
         line = f.readline().strip('\n').strip('\t') # file line without spaces nor tab characteres at line start/end
         headers = line.split('\t')                  # file headers are listed
-        added_headers = ('OS_ver', 'DBL')           # additional headers (tuple where to add eventual new headers after the first script release)
-        latest_header = added_headers[-1]           # header meant to be the latest
-        last_header = headers[-1].strip().strip('\t') # header found as last
-        
-        if last_header != latest_header:            # case last_header in existing log file differs from latest_header
-            print(f"\nOne time action: Adding column header(s) to Cubotino_solver_log.txt as per last script release\n")
+        if 'CubeStatus(BGR)' in headers:            # case 'CubeStatus(BGR)' in one of the headers 
+            print(f"\nOne time action: Changing 'CubeStatus(BGR)' to 'CubeColors(BGR or HSV or BGR,HSV)'")
+            len_headers = len(headers)              
             new_headers = ''                        # empty string is assigned to the new_headers variable
-            for header in headers:                  # iteration over the current listed headers
-                new_headers += header + '\t'        # new_headers string with tab separated headers
+            for i, header in enumerate(headers):    # iteration over the current listed headers
+                if header == "CubeStatus(BGR)":     # case the header is 'CubeStatus(BGR)'
+                    new_headers += 'CubeColors(BGR or HSV or BGR,HSV)'  # new_headers string
+                else:                               # case the header is not 'CubeStatus(BGR)'
+                    new_headers += header           # new_headers string
+                if i < len_headers-1:               # case the header is not the last one 
+                    new_headers += '\t'             # tab separator is added to the new_headers string
+                elif i == len_headers-1:            # case the header is the last one 
+                    new_headers += '\n'             # end of line character is added to the new_headers string
+                else:                               # case the iterator is not < or == of the header_list lenght
+                    print("error at check_headers function") # feedback is printed to terminal
+
+            # writing the updated headers in the 'existing' file, requires a second temporary file
+            with open(fname, 'r') as orig:          # Cubotino_solver_log.txt file is temporary opened as orig
+                temp_fname = folder + '/temp.txt'   # name for a temporary file
+                with open(temp_fname, "w") as temp: # temporary file is opened in write mode
+                    for i, data_line in enumerate(orig):  # iteration over the lines of data in orig file Cubotino_solver_log.txt
+                        if i == 0:                  # case the iteration is on the first row
+                            temp.write(new_headers) # the new_headers is written to the temporary file
+                        else:                       # case the iteration is not on the first row
+                            temp.write(data_line)   # data_line from orig file is written to temp file
+
+            os.remove(fname)                        # fname file (Cubotino_solver_log.txt) is removed
+            os.rename(temp_fname, fname)            # temp file is renamed as Cubotino_solver_log.txt (now with latest headers)
             
-            # index of the last header used (previous script) in the new headers tupple
-            if last_header in added_headers:        # case the latest header in the original .txt file is found in the added_headers tuple
-                last_used_header_idx  = added_headers.index(last_header)   # index of the element in tuple is assigned
-                
-                iterations = len(added_headers)-last_used_header_idx-1
-                for i in range(iterations):             # iteration for the missed headers 
-                    idx = last_used_header_idx + 1 + i  # pointer for the element in added_header stuple
-                    new_headers += added_headers[idx]   # additional header, at idx position in added_headers tupple, is added
-                    print("Added header:", added_headers[idx]) # feedback is printed to the terminal
-                    if idx < iterations:                # case the iteration has not reached the last loop
-                        new_headers += '\t'             # tab separator is added to headers
-                    else:                               # case the iteration has reached the last loop
-                        new_headers += '\n'             # end of line character is added to headers
-                print()
+        else:   # case the header to be corrected (CubeStatus(BGR)) is not in the headers
+            if 'CubeColors(BGR or HSV or BGR,HSV)' not in headers:  # case 'CubeColors(BGR or HSV or BGR,HSV' in not in the headers 
+                print("Cannot correct 'CubeStatus(BGR)' to 'CubeColors(BGR or HSV or BGR,HSV)' ")  # feedback is printed to terminal
+        return
+    
+    
+    # this part is eventually used to add new headers
+#     with open(fname, 'r') as f:                     # file is opened, to adjust the headers in case
+#         line = f.readline().strip('\n').strip('\t') # file line without spaces nor tab characteres at line start/end
+#         headers = line.split('\t')                  # file headers are listed
+#         added_headers = ('XXXX', 'YYYY')            # additional headers (tuple where to add eventual new headers after the first script release)
+#         latest_header = added_headers[-1]           # header meant to be the latest
+#         last_header = headers[-1].strip().strip('\t') # header found as last
+#         
+#         if last_header != latest_header:            # case last_header in existing log file differs from latest_header
+#             print(f"\nOne time action: Adding column header(s) to Cubotino_solver_log.txt as per last script release\n")
+#             new_headers = ''                        # empty string is assigned to the new_headers variable
+#             for header in headers:                  # iteration over the current listed headers
+#                 new_headers += header + '\t'        # new_headers string with tab separated headers
+#             
+#             # index of the last header used (previous script) in the new headers tupple
+#             if last_header in added_headers:        # case the latest header in the original .txt file is found in the added_headers tuple
+#                 last_used_header_idx  = added_headers.index(last_header)   # index of the element in tuple is assigned
+#                 
+#                 iterations = len(added_headers)-last_used_header_idx-1
+#                 for i in range(iterations):             # iteration for the missed headers 
+#                     idx = last_used_header_idx + 1 + i  # pointer for the element in added_header stuple
+#                     new_headers += added_headers[idx]   # additional header, at idx position in added_headers tupple, is added
+#                     print("Added header:", added_headers[idx]) # feedback is printed to the terminal
+#                     if idx < iterations:                # case the iteration has not reached the last loop
+#                         new_headers += '\t'             # tab separator is added to headers
+#                     else:                               # case the iteration has reached the last loop
+#                         new_headers += '\n'             # end of line character is added to headers
+#                 print()
+# 
+#                 # writing the updated headers in the 'existing' file, requires a second temporary file
+#                 with open(fname, 'r') as orig:          # Cubotino_solver_log.txt file is temporary opened as orig
+#                     temp_fname = folder + '/temp.txt'   # name for a temporary file
+#                     with open(temp_fname, "w") as temp: # temporary file is opened in write mode
+#                         for i, data_line in enumerate(orig):  # iteration over the lines of data in orig file Cubotino_solver_log.txt
+#                             if i == 0:                  # case the iteration is on the first row
+#                                 temp.write(new_headers) # the new_headers is written to the temporary file
+#                             else:                       # case the iteration is not on the first row
+#                                 temp.write(data_line)   # data_line from orig file is written to temp file
+# 
+#                 os.remove(fname)                        # fname file (Cubotino_solver_log.txt) is removed
+#                 os.rename(temp_fname, fname)            # temp file is renamed as Cubotino_solver_log.txt (now with latest headers)
+#             
+#             else:   # case the latest header in the original .txt file is NOT found in the added_headers tuple
+#                 print("Cannot add the additional headers to the Cubotino_solver_log.txt file")  # feedback is printed to terminal
 
-                # writing the updated headers in the 'existing' file, requires a second temporary file
-                with open(fname, 'r') as orig:          # Cubotino_solver_log.txt file is temporary opened as orig
-                    temp_fname = folder + '/temp.txt'   # name for a temporary file
-                    with open(temp_fname, "w") as temp: # temporary file is opened in write mode
-                        for i, data_line in enumerate(orig):  # iteration over the lines of data in orig file Cubotino_solver_log.txt
-                            if i == 0:                  # case the iteration is on the first row
-                                temp.write(new_headers) # the new_headers is written to the temporary file
-                            else:                       # case the iteration is not on the first row
-                                temp.write(data_line)   # data_line from orig file is written to temp file
-
-                os.remove(fname)                        # fname file (Cubotino_solver_log.txt) is removed
-                os.rename(temp_fname, fname)            # temp file is renamed as Cubotino_solver_log.txt (now with latest headers)
-            
-            else:   # case the latest header in the original .txt file is NOT found in the added_headers tuple
-                print("Cannot add the additional headers to the Cubotino_solver_log.txt file")  # feedback is printed to terminal
 
 
 
@@ -2829,8 +3248,7 @@ def check_headers(folder, fname):
 
 
 
-
-def log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner, \
+def log_data(timestamp, facelets_data, cube_status_string, solution, cdw, \
              tot_robot_time, start_time, camera_ready_time, cube_detect_time, cube_solution_time,\
              robot_solving_time, slow_time_s, os_version, fcs):
     
@@ -2863,7 +3281,7 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
         o = 'OS_ver'                                    # column header
         p = 'CubeStatus'                                # column header
         q = 'CubeSolution'                              # column header
-        r = 'CubeStatus(BGR)'                           # column header
+        r = 'CubeColor(BGR or HSV or BRG,HSV)'          # column header
 
         
         
@@ -2884,14 +3302,12 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
         with open(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o777), 'a') as f:    # text file is temporary opened
             f.write(s)               # data is appended
 
+  
+    else:                                               # case the file does exist
+        check_headers(folder, fname)                    # checks if necessary to add new headers to the log file
 
-# uncomment the first time new headers will be added (after the 1st release
-###########################    
-#     else:                                               # case the file does exist
-#         check_headers(folder, fname)                    # checks if necessary to add new headers to the log file
-###########################
-    
-    if color_detection_winner != 'Error':               # case the cube_detection_status doe not equal 'Error'
+    # cdw = color detection winner
+    if cdw != 'Error':                                  # case the cube_detection_winner does not equal 'Error'
         css = cube_status_string                        # it is assigned to css variable
         if 'D' in css or 'B' in css or 'L' in css:      # case DBL characters in css (cube_status_string)
             urf_dbl='DBL'                               # 'DBL'is assigned to urf_dbl variable
@@ -2906,7 +3322,7 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
     b='screen'if screen else 'no screen'                # screen presence or absence (it influences the cube detection time)
     c='1' if flip_to_close_one_step else '2'            # flip tp close_cover method used (1 or 2 steps)
     d=frameless_cube                                    # frameless cube setting
-    e=str(color_detection_winner)                       # wich method delivered the coherent cube status
+    e=str(cdw)                                          # wich method delivered the coherent cube status
     f=str(round(tot_robot_time,1))                      # total time from camera warmup to cube solved
     g=str(round(camera_ready_time-start_time,1))        # time to get the camera gains stable
     h=str(round(cube_detect_time-camera_ready_time,1))  # time to read the 6 cube faces
@@ -2980,9 +3396,21 @@ def close_camera():
 
 def robot_set_servo(debug):
     """ The robot uses a couple of servos; This functions positions the servos to the start position."""
+
+    global silent
     
-    # servos are initialized, and set to their starting positions
-    ret, timer = servo.init_servo(debug, start_pos = 'read', f_to_close_mode=flip_to_close_one_step)
+    if debug:                           # case debug is set True
+        print("Setting servos with silent as:", silent) # feedback is printed to the terminal
+    
+    timer = []                          # empty list to store the timer values
+    
+    if not silent:                      # case silent is set True
+        # servos are initialized, and set to their starting positions
+        ret, timer = servo.init_servo(debug, start_pos = 'read', f_to_close_mode=flip_to_close_one_step)
+    else:                               # case silent is set False
+        ret, timer = servo.init_servo(debug, start_pos = 'read', f_to_close_mode=flip_to_close_one_step, s_silent=True)
+        print("timer:", timer)
+    
     return ret, timer
 
 
@@ -3372,8 +3800,6 @@ def stop_or_quit():
     
     print('Stop request')                    # feedback is printed to the terminal
     ref_time=time.time()                     # reference time used to measure how long the button has been kept pressed
-    # warn_time = 1.5                        # delay used as threshold to print a warning on display
-    # quit_time = 4.0                        # delay used as threshold to quit the script
     warning = False                          # warning is set false, to warn user to keep or release the button
     quitting = False                         # quitting variable is set false
 
@@ -3754,12 +4180,15 @@ def plot_animation(wait, ref_colors_BGR, cube_status, startup=False, kill=False)
                          'D':(ref_colors_BGR[3]), 'L':(ref_colors_BGR[4]), 'B':(ref_colors_BGR[5])}
         
         d_a = 80                                    # edge lenght for each facelet reppresentation
-        x_start_a = 20                              # x coordinate origin for the sketch
-        y_start_a = 20                              # y coordinate origin for the sketch
-        sketch_a = np.zeros([6*d_a + 2*y_start_a, 8*d_a + 2*x_start_a, 3],dtype=np.uint8)  # empty array
+        g_a = d_a // 10                             # empty gap between the cube faces
+        x_start_a = 20                              # x coordinate origin for the sketch (empty frame)
+        y_start_a = 20                              # y coordinate origin for the sketch (empty frame)
+        w_a = 2*x_start_a + 8*d_a + 3*g_a           # image width for the animation
+        h_a = 2*y_start_a + 6*d_a + 2*g_a           # image height for the animation
+        sketch_a = np.zeros([h_a, w_a, 3],dtype=np.uint8)  # empty array (image dimension of h_a times w_a times 3 colors)
         sketch_a.fill(230)                          # array is filled with light gray
         
-        _, facelets_start_a = cube_sketch_coordinates(x_start_a, y_start_a, d_a)  # dict with the top-left coordinates for each of the 24 facelets
+        _, facelets_start_a = cube_sketch_coordinates(x_start_a, y_start_a, d_a, gap=g_a)  # dict with the top-left coordinates for each of the 24 facelets
         
         inner_points_a = []                         # empty list to store the inner points (coordinates) to be later colored
         for i in range(24):                         # iteration over the 24 facelets
@@ -3858,6 +4287,8 @@ def animation(screen, ref_colors_BGR, cube_status_string, robot_moves):
                 if i == frames-1 and not robot_stop:  # case for the last frames (the new if serves the case of 1 frames)
                     # the final cube status is plot to the screen, with kill instruction
                     plot_animation(t1, ref_colors_BGR, csa[i], kill=True)
+            if robot_stop:                          # case there are requests to stop the robot 
+                cv2.destroyAllWindows()             # all the windows are closed
 
 
 
@@ -3871,7 +4302,7 @@ def start_up(first_cycle=False, set_cropping=False):
     # global variables
     global camera, width, height, w, h                    # camera and frame related variables
     global show_time, cam_led_bright                      # camera and frame related variables
-    global sides, side, faces, prev_side, BGR_mean, URFDLB_facelets_BGR_mean      # cube status detection related variables
+    global sides, side, faces, prev_side, BGR_mean, HSV_mean, URFDLB_facelets_BGR_mean  # cube status detection related variables
     global timeout, detect_timeout, robot_stop            # robot related variables
     global font, fontScale, fontColor, lineType           # cv2 text related variables
     global timer, f_coordinates, fcs_delay
@@ -3881,7 +4312,9 @@ def start_up(first_cycle=False, set_cropping=False):
     # series of variables settings, to re-set at each cycle
     prev_side=0                      # set the initial previous side to zero
     BGR_mean=[]                      # empty list to be filled with with 24 facelets BGR colors while reading cube status
+    HSV_mean=[]                      # empty_ list to be filled with with 24 facelets HUE values, while reading cube status
     URFDLB_facelets_BGR_mean=[]      # empty list to be filled with with 24 facelets colors, ordered according URFDLB order
+    URFDLB_facelets_HSV_mean=[]
     faces={}                         # dictionary that store the image of each face
     side=0                           # set the initial cube side (cube sides are 1 to 6, while zero is used as starting for other setting)
     cpu_temp(side)                   # cpu temp is checked at cube solving-end
@@ -3926,7 +4359,7 @@ def start_up(first_cycle=False, set_cropping=False):
 
 def cubeAF():
     """ This function is substantially the main function, covering all the different phases after the initial settings:
-        Camera setting for 1st side and remaining
+        Camera setting
         Keeps interrogating the camera
         Cube status detection
         Cube solver call
@@ -3935,102 +4368,104 @@ def cubeAF():
     # global variables
     global os_version, camera, width, height, h, w, cam_led_bright, fixWindPos, screen    # camera and frame related variables          
     global sides, side, prev_side, faces, BGR_mean, URFDLB_facelets_BGR_mean              # cube status detection related variables
+    global HSV_mean, URFDLB_facelets_HSV_mean                                             # cube status detection related variables
     global font, fontScale, fontColor, lineType                                           # cv2 text related variables
     global servo, robot_stop, robot_idle, timeout, detect_timeout                         # robot related variables
 
 
-    robot_idle = False                              # robot is not anymore idling
-    side = 0                                        # side zero is used for some initialization processes
+    robot_idle = False                                           # robot is not anymore idling
+    side = 0                                                     # side zero is used for some initialization processes
     
-    if not camera_opened_check():                   # checks if camera is responsive
-        print('\nCannot open camera')               # feedback is printed to the terminal
-        disp.show_on_display('CAMERA', 'ERROR', fs1=26, fs2=26)     # feedback is printed to the display
-        time.sleep(10)                              # delay to allows display to be read
-        quit_func(quit_script=True)                 # script is closed, in case of irresponsive camera
+    if not camera_opened_check():                                # checks if camera is responsive
+        print('\nCannot open camera')                            # feedback is printed to the terminal
+        disp.show_on_display('CAMERA', 'ERROR', fs1=26, fs2=26)  # feedback is printed to the display
+        time.sleep(10)                                           # delay to allows display to be read
+        quit_func(quit_script=True)                              # script is closed, in case of irresponsive camera
     
-    start_time = time.time()                        # initial time is stored before picamera warmup and setting
-    faces.clear()                                   # empties the dict of images (6 sides) recorded during previous solving cycle
-    facelets = []                                   # empties the list of contours having cube's square characteristics
-    all_coordinates = []                            # empties the list of contours centers coordinate as reference for next facelet search
-    robot_to_cube_side(side, cam_led_bright)        # robot set with camera on read position
-    servo.cam_led_On(cam_led_bright)                # led on top_cover is switched on before the PiCamera warmup phase
+    start_time = time.time()                                     # initial time is stored before picamera warmup and setting
+    faces.clear()                                                # empties the dict of images (6 sides) recorded during previous solving cycle
+    facelets = []                                                # empties the list of contours having cube's square characteristics
+    all_coordinates = []                                         # empties the list of contours centers coordinate as reference for next facelet search
+    robot_to_cube_side(side, cam_led_bright)                     # robot set with camera on read position
+    servo.cam_led_On(cam_led_bright)                             # led on top_cover is switched on before the PiCamera warmup phase
     
-    if not robot_stop:                              # case there are no requests to stop the robot
-        timestamp = dt.datetime.now().strftime('%Y%m%d_%H%M%S') # date_time variable is assigned, for file name and log purpose
+    if not robot_stop:                                           # case there are no requests to stop the robot
+        timestamp = dt.datetime.now().strftime('%Y%m%d_%H%M%S')  # date_time variable is assigned, for file name and log purpose
         robot_consistent_camera_images(debug, os_version, camera, start_time)  # sets PiCamera to capture consistent images
-        camera_ready_time=time.time()               # time stored after picamera warmup and settings for consistent pictures
-        side = 1                                    # side is changed to 1, as the cube faces are numbered from 1 to 6
-        fcs = 0                                     # fcs = fix coordinates system, is initially set False (0)
-        t_ref = time.time()                         # timer is reset (timer used on each face detection to eventually witch to fix coordinates)
+        camera_ready_time=time.time()                            # time stored after picamera warmup and settings for consistent pictures
+        side = 1                                                 # side is changed to 1, as the cube faces are numbered from 1 to 6
+        fcs = 0                                                  # fcs = fix coordinates system, is initially set False (0)
+        t_ref = time.time()                                      # timer is reset (timer used on each face detection to eventually witch to fix coordinates)
 
 
-    while not robot_stop:                           # substantially the main loop, it can be interrupted by quit_func() 
-        if robot_stop:                              # case the robot has been stopped
-            break                                   # while loop is interrupted
+    while not robot_stop:                                        # substantially the main loop, it can be interrupted by quit_func() 
+        if robot_stop:                                           # case the robot has been stopped
+            break                                                # while loop is interrupted
         
-        plot_to_display(side)                       # feedback is printed to the display
-        frame, w, h = read_camera()                 # video stream and frame dimensions
+        plot_to_display(side)                                    # feedback is printed to the display
+        frame, w, h = read_camera()                              # video stream and frame dimensions
         
-        if screen:                                  # case screen variable is set True
-            cv2.namedWindow('cube')                 # create the cube window
-            if fixWindPos:                          # case the fixWindPos variable is chosen  
-                cv2.moveWindow('cube', 0,0)         # move the window to (0,0)
+        if screen:                                               # case screen variable is set True
+            cv2.namedWindow('cube')                              # create the cube window
+            if fixWindPos:                                       # case the fixWindPos variable is chosen  
+                cv2.moveWindow('cube', 0,0)                      # move the window to (0,0)
         
-        if not robot_stop:                                   # case there are no requests to stop the robot
-            (contours, hierarchy)=read_facelets(frame, w, h) # reads cube's facelets and returns the contours
-            candidates = []                                  # empties the list of potential contours
+        if not robot_stop:                                       # case there are no requests to stop the robot
+            (contours, hierarchy)=read_facelets(frame, w, h)     # reads cube's facelets and returns the contours
+            candidates = []                                      # empties the list of potential contours
         
-        if not robot_stop and hierarchy is not None:         # analyze the contours in case these are previously retrieved
-            hierarchy = hierarchy[0]                         # only top level contours (no childs)
-            facelets = []                                    # empties the list of contours having cube's square characteristics
+        if not robot_stop and hierarchy is not None:             # analyze the contours in case these are previously retrieved
+            hierarchy = hierarchy[0]                             # only top level contours (no childs)
+            facelets = []                                        # empties the list of contours having cube's square characteristics
             
-            if timeout or robot_stop:                        # in case of reached timeout or stop_button pressed
-                quit_func(quit_script=False)                 # quit function is called, withou forcing the script quitting
-                break                                        # while loop is interrupted
+            if timeout or robot_stop:                            # in case of reached timeout or stop_button pressed
+                quit_func(quit_script=False)                     # quit function is called, withou forcing the script quitting
+                break                                            # while loop is interrupted
             
-            for component in zip(contours, hierarchy):                # each contour is analyzed   
+            for component in zip(contours, hierarchy):           # each contour is analyzed   
                 contour, hierarchy, corners = get_approx_contours(component)  # contours are approximated
     
                 if  time.time() - camera_ready_time > detect_timeout:  # timeout is calculated for the robot during cube status reading
-                    timeout = robot_timeout_func()                     # in case the timeout is reached
-                    break                                              # for loop is interrupted
+                    timeout = robot_timeout_func()               # in case the timeout is reached
+                    break                                        # for loop is interrupted
                 
-                if robot_stop:                                         # case the robot has been stopped
-                    break                                              # for loop is interrupted
+                if robot_stop:                                   # case the robot has been stopped
+                    break                                        # for loop is interrupted
                 
-                if screen and not robot_stop:                          # case screen variable is set True
-                    cv2.imshow('cube', frame)                          # shows the frame 
+                if screen and not robot_stop:                    # case screen variable is set True
+                    cv2.imshow('cube', frame)                    # shows the frame 
                     cv2.waitKey(1)      # refresh time is minimized to 1ms, refresh time mostly depending to all other functions
                 
-                if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:   # case the facelets detection takes more than fcs_delay secs
-                    facelets, frame = get_facelets_fcs(facelets, frame)   # facelets info are based on fix coordinates
-                    fcs += 1                                           # fcs (Fix Coordinates System) is incremented
+                if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:  # case the facelets detection takes more than fcs_delay secs
+                    facelets, frame = get_facelets_fcs(facelets, frame)  # facelets info are based on fix coordinates
+                    fcs += 1                                     # fcs (Fix Coordinates System) is incremented
                 
-                if corners==4:                                         # contours with 4 corners are of interest
+                if corners==4:                                   # contours with 4 corners are of interest
                     facelets, frame = get_facelets(facelets, frame, contour, hierarchy) # returns a dict with cube compatible contours
                 
-                if len(facelets)==4:                                   # case there are 4 contours having facelets compatible characteristics
+                if len(facelets)==4:                             # case there are 4 contours having facelets compatible characteristics
                     facelets = order_4contours(facelets, new_center=[])  # contours are ordered from top left
-                    d_to_exclude = distance_deviation(facelets)        # facelets to remove due inter-distance not as regular 3x3 array
-                    if len(d_to_exclude)>=1:                           # check if any contour is too far to be part of the cube
-                        d_to_exclude.sort(reverse=True)                # reverse the contours order
-                        for i in d_to_exclude:                         # remove the contours too faar far to be part of the cube
-                            facelets.pop(i)                            # facelet is removed
+                    d_to_exclude = distance_deviation(facelets)  # facelets to remove due inter-distance not as regular 3x3 array
+                    if len(d_to_exclude)>=1:                     # check if any contour is too far to be part of the cube
+                        d_to_exclude.sort(reverse=True)          # reverse the contours order
+                        for i in d_to_exclude:                   # remove the contours too faar far to be part of the cube
+                            facelets.pop(i)                      # facelet is removed
                 
-                if len(facelets)==4:                                   # case having 4 contours compatible to a cube face
-                    if fcs == 0:                                       # case facelets were detected without the fix coordinates system method
-                        coordinates=[]                                 # empty list to store the facelets coordinates of the last scanned face
-                        for i in range(4):                             # iteration over the 4 facelets
-                            coordinates.append(facelets[i]['cx'])      # x coordinate is retrieved and appended to the coordinates list
-                            coordinates.append(facelets[i]['cy'])      # y coordinate is retrieved and appended to the coordinates list
-                        all_coordinates.append(coordinates)            # 4 facelets centers coordinates are appended to all_coordinates (all faces)
+                if len(facelets)==4:                             # case having 4 contours compatible to a cube face
+                    if fcs == 0:                                 # case facelets were detected without the fix coordinates system method
+                        coordinates=[]                           # empty list to store the facelets coordinates of the last scanned face
+                        for i in range(4):                       # iteration over the 4 facelets
+                            coordinates.append(facelets[i]['cx'])  # x coordinate is retrieved and appended to the coordinates list
+                            coordinates.append(facelets[i]['cy'])  # y coordinate is retrieved and appended to the coordinates list
+                        all_coordinates.append(coordinates)      # 4 facelets centers coordinates are appended to all_coordinates (all faces)
                     
-                    facelets = robot_facelets_rotation(facelets)       # order facelets as per viewer POW (due to cube/camera rotations on robot)
-                    cube_facelets_colors(frame, facelets, candidates, BGR_mean)    # each facelet is read for color
-                    URFDLB_facelets_BGR_mean = URFDLB_facelets_order(BGR_mean)     # facelets are ordered as per URFDLB order
-                    plot_to_display(side, URFDLB_facelets_BGR_mean)     # detected colour are plot to the display
+                    facelets = robot_facelets_rotation(facelets) # order facelets as per viewer POW (due to cube/camera rotations on robot)
+                    cube_facelets_colors(frame, facelets, candidates, BGR_mean, HSV_mean)    # each facelet is read for color
+                    URFDLB_facelets_BGR_mean = URFDLB_facelets_order(BGR_mean)     # facelets BGR are ordered as per URFDLB order
+                    URFDLB_facelets_HSV_mean = URFDLB_facelets_order(HSV_mean)     # facelets HSV are ordered as per URFDLB order
+                    plot_to_display(side, URFDLB_facelets_BGR_mean)   # detected colour are plot to the display
 
-                    faces = face_image(frame, facelets, side, faces)    # image of the cube side is taken for later reference
+                    faces = face_image(frame, facelets, side, faces)  # image of the cube side is taken for later reference
                     
                     if screen and not robot_stop:                # case screen variable is set True
                         if cv_wow:                               # case the cv image analysis plot is set true                              
@@ -4059,50 +4494,81 @@ def cubeAF():
                             except:                              # in case of exceptions
                                 pass                             # do nothing
                         
-                        ref_colors_BGR = cube_colors_clusters(URFDLB_facelets_BGR_mean)  # six reference colors out of the 24 facelets
-                        cube_status = cube_colors_interpr(URFDLB_facelets_BGR_mean, ref_colors_BGR) # cube string status
+                        # initializing some variables
+                        solution_Text = ''                       # empty text is assigned to solution_Text
+                        moves = []                               # empty list is assigned to moves
+                        cdw = 'Error'                            # Error is assigned to cdw variable (color detection winner)
+                        
+                        # getting the dominant colors
+                        label, ref_colors_BGR = cube_colors_clusters(URFDLB_facelets_BGR_mean, vectors=3, clusters=6)  # six reference BGR colors out of the 24 facelets
+                        ref_colors_BGR = np.uint8(ref_colors_BGR).tolist()  # clustered colors convertered to 8bit and assigned to a list
+                        cube_status = cube_colors_interpr_BGR(URFDLB_facelets_BGR_mean, ref_colors_BGR)  # cube status via BGR color space analysis
                         
                         if len(cube_status) == 24:               # case the cube_status has 24 elements 
                             cube_status_string = cube_string(cube_status) # cube string for the solver
 
                             # Kociemba solver is called to have the solution string
-                            solution, solution_Text, robot_moves, total_robot_moves, est_time = cube_solution(cube_status_string)
-                            color_detection_winner = 'BGR'       # variable used to log which method gave the solution
+                            solution, solution_Text, robot_moves, total_robot_moves, est_time, tot_s = cube_solution(cube_status_string)
+                            cdw = 'BGR'                          # variable used to log which method gave the solution
                             cube_solution_time = time.time()     # time stored after getting the cube solution
+                            print(f'\nCube status (Via BGR): {cube_status_string}')   # feedback is printed to the terminal
                             
-                            # feedback to terminal
-                            print(f'\nCube status : {cube_status_string}')   # feedback is printed to the terminal
-                            if solution_Text == 'Error':         # case the cube solution equals Error
-                                print(f'Solver return: {solution}\n')  # feedback is printed to the terminal
-                            else:                                # case the cube solution is not Error
-                                if len(solution)!=0:             # case the solution lenght is not zero
-                                    s = ''
-                                    for i in range(len(solution)//2):
-                                        s += solution[i:i+2] + " "
-                                    if 'B'in solution or 'D' in solution or 'L' in solution:  # case of a DBL solution
-                                        
-                                        print(f'Selected (optimized) solution : {s}')   # feedback is printed to the terminal
-                                    else:                        # case of URF solution
-                                        print(f'Selected solution : {s}')   # feedback is printed to the terminal
-                            print(f'Camera warm-up, camera setting, cube status (BGR), and solution, in: {round(time.time()-start_time,1)} secs')         
-                                
-                        
-                        elif len(cube_status) == 0:              # case the cube_status is empty (cube detection error)
-                            solution = ''
-                            solution_Text = 'Error'
-                            robot_moves = ''
-                            total_robot_moves = 0
-                            est_time=0
-                            color_detection_winner = 'Error'
-                            cube_status_string = cube_string(cube_status)
-                            cube_solution_time = time.time()     # time
+                        elif len(cube_status) == 0:              # case the cube_status has 0 elements
+                            solution_Text = 'Error'              # 'Error' is assigned to the solution_Text
 
+################ DEBUG ################
+#                         solution_Text = 'Error'                # uncoment these rows to force HSV color analysis method
+#                         ref_colors_BGR = []                    # uncoment these rows to force HSV color analysis method
+#######################################
+
+                        if solution_Text == 'Error':             # case the cube solution, from BGR analysis, returned Error
+                            cube_status, ref_colors_BGR = cube_colors_interpr_HSV(URFDLB_facelets_HSV_mean)  # cube status via HSV color space analysis
+                            
+                            if len(cube_status) == 24:           # case the cube_status has 24 elements 
+                                cube_status_string = cube_string(cube_status) # cube string for the solver
+
+                                # Kociemba solver is called to have the solution string
+                                solution, solution_Text, robot_moves, total_robot_moves, est_time, tot_s = cube_solution(cube_status_string)
+                                cdw = 'HSV'                      # variable used to log which method gave the solution
+                                cube_solution_time = time.time() # time stored after getting the cube solution
+                                print(f'\nCube status (via HSV): {cube_status_string}')   # feedback is printed to the terminal
+                            
+                            elif len(cube_status) == 0:          # case the cube_status has 0 elements
+                                solution_Text = 'Error'          # 'Error' is assigned to the solution_Text
+                                
+                                
+                        if solution_Text != 'Error' and len(moves) > 0:  # case there is not errors and the cube is not already solved
+                            s = ''                               # empty string is assigned to the variable s
+                            for i in range(len(solution)//2):    # iteration over the solution, in step of two chracters
+                                s += solution[i:i+2] + " "       # an enpty space is added every two characters, to improve readability
+                            if 'B'in solution or 'D' in solution or 'L' in solution:  # case of a DBL solution
+                                print(f'Selected (optimized) solution : {s}')   # feedback is printed to the terminal
+                            else:                                # case of URF solution
+                                print(f'Selected solution : {s}')  # feedback is printed to the terminal
+
+                        if len(cube_status) == 0 or solution_Text == 'Error':  # case the cube_status is empty or cube detection error
+                            solution = ''                        # empty text is assigned to the solution variable
+                            solution_Text = 'Error'              # Error is assigned to solution_Text variable
+                            robot_moves = ''                     # empty text is assigned to the robot_moves variable
+                            total_robot_moves = 0                # zero is assigned to total_robot_moves variable
+                            est_time = 0                         # zero is assigned to est_time variable
+                            tot_s = 0                            # zero is assigned to tot_s variable
+                            cdw = 'Error'                        # Error is assigned to cdw variable
+                            cube_status_string = cube_string(cube_status)  #  cube_status_string (of the incoherent cube status)
+                            cube_solution_time = time.time()     # time reference
+                        
+                        # feedback is printed to the terminal
+                        if tot_s > 1:                            # case of multiple solutions were available
+                            print('Total of possible solving solutions:', tot_s)
+                        print(f'Camera warm-up, camera setting, cube status ({cdw}), and solution, in: {round(time.time()-start_time,1)} secs')
+                        
+                        # call the function taking care of solving the cube, making the cube sketch, animation, saving the logs, etc
                         robot_solve_cube(fixWindPos, screen, frame, faces, ref_colors_BGR, cube_status, 
-                                         URFDLB_facelets_BGR_mean, font, fontScale, lineType, show_time,
-                                         timestamp, solution, solution_Text, robot_moves, total_robot_moves,
-                                         est_time, color_detection_winner, cube_status_string, BGR_mean,
-                                         start_time, camera_ready_time, cube_detect_time, cube_solution_time,
-                                         slow_time_s, os_version, fcs)
+                                         URFDLB_facelets_BGR_mean, URFDLB_facelets_HSV_mean, font, fontScale,
+                                         lineType, show_time, timestamp, solution, solution_Text, robot_moves,
+                                         total_robot_moves, est_time, cdw, cube_status_string,
+                                         BGR_mean, start_time, camera_ready_time, cube_detect_time,
+                                         cube_solution_time, slow_time_s, os_version, fcs)
                         
                         if fcs == 0:   # (fcs = fix coordinates system) case the all facelets were detected without the fix coordinates method
                             save_coordinates(all_coordinates)    # saves the coordinates of the 4 facelets found during scanning
@@ -4240,6 +4706,9 @@ if __name__ == "__main__":
 
         
     ################    processor version info    ###################################################
+    with open('/proc/device-tree/model') as f:   # Raspberry Pi board is verified
+            print("Board:", f.read())       # feedback is printed to the terminal
+    
     # when Rpi_ZeroW it uses slightly different openCV comands to prevent crashing (not Zero2W)
     import os                               # os is imported to check the machine
     Rpi_ZeroW = False                       # flag of a lighter program (OK on Rpi 3, 4 and Zero2)
@@ -4260,21 +4729,21 @@ if __name__ == "__main__":
     os_version = get_os_version()          # OS is checkjed
     if os_version==10:                     # case os_version equals 10
         print(f'Operative System found: Buster (10)') # print to terminal the OS version detected
-        os_ver_txt = 'Buster'
+        os_ver_txt = 'Buster'              # 'Buster' is assigned to os_ver_txt variable
     elif os_version==11:                   # case os_version equals 11
         print(f'Operative System found: Bullseye (11)')  # print to terminal the OS version detected
-        os_ver_txt = 'Bullseye'
+        os_ver_txt = 'Bullseye'            # 'Bullseye' is assigned to os_ver_txt variable
     else:                                  # other cases
-        line = "#"*80
-        print('\n\n')
-        print(line)
+        line = "#"*80                      # define a separation line
+        print('\n\n')                      # print two empty lines
+        print(line)                        # print a separation line
         print('  The detected OS is not listed on those compatible with Cubotino  ')
-        print(line)
-        print('\n\n')
+        print(line)                        # print a separation line
+        print('\n\n')                      # print two empty lines
     
-    script_v = version[:3]
+    script_v = version[:3]                 # retrieve the script version (3 characters)
     disp.set_backlight(1)                  # display backlight is turned on, in case it wasn't
-    disp.show_on_display('OS: '+ os_ver_txt, 'Script V:'+ script_v, fs1=18, fs2=18) #feedbak is print to to the display
+    disp.show_on_display('OS: '+ os_ver_txt, 'Script V:'+ script_v, fs1=18, fs2=18) # feedbak is print to to the display
     time.sleep(3)                          # time delay to let possible readig the display
     # ###############################################################################################
     
@@ -4318,13 +4787,16 @@ if __name__ == "__main__":
         if timer:                                         # case the timer visualization is set true
             print('Timer is visualized after scrambling function')   # feedback is printed to the terminal 
         
-        if frameless_cube == 'false':                               # case the frameless string variale equals to false
+        if frameless_cube == 'false':                     # case the frameless string variale equals to false
             print('\nCube status detection set for cube with black frame around the facelets')  # feedback is printed to the terminal 
-        elif frameless_cube == 'true':                              # case the frameless string variale equals to 'true'
+        elif frameless_cube == 'true':                    # case the frameless string variale equals to 'true'
             print('\nCube status detection set for frameless cube') # feedback is printed to the terminal
-        elif frameless_cube == 'auto':                              # case the frameless string variale equals to 'auto'
+        elif frameless_cube == 'auto':                    # case the frameless string variale equals to 'auto'
             print('\nCube status detection set for both cubes with and without black frame')   # feedback is printed to the terminal 
-            print('This setting takes slightly longer time for the cube status detection\n')   # feedback is printed to the terminal
+            print('This setting takes slightly longer time for the cube status detection')   # feedback is printed to the terminal
+        
+        if slow_time_s > 0:                               # case slow_time_s is bigger than zero
+            print(f'\nEach servo movement is delayed by {slow_time_s} secs')   # feedback is printed to the terminal 
         
         if picamera_test:                                 # case picamera_test is set true (servos disabling)
             print(f'\nPiCamera test enabled')             # feedback is printed to the terminal
@@ -4349,8 +4821,10 @@ if __name__ == "__main__":
     start_up(first_cycle = True)            # sets the initial variables, in this case it is the first cycle
     solv_cycle = 0                          # variable to count the solving cycles per session is set to zero
     scramb_cycle = 0                        # variable to count the scrambling cycles per session is set to zero
-    quit_script = False
-    print('\n#############################################################################\n')
+    quit_script = False                     # quit_script is set False
+    print()                                 # print an empty line
+    print('#'*77)                           # print a separation line
+    print()                                 # print an empty line
     # ###############################################################################################
     
     
@@ -4422,9 +4896,9 @@ if __name__ == "__main__":
                     solv_cycle = cycles_num     # cycle_num is assigned to variable counting the solving cycles manually requested
                     scramb_cycle = cycles_num   # cycle_num is assigned to variable counting the scrambling cycles manually requested
                     
-                    if args.shutoff:                  # case the --shutoff argument has been provided
+                    if args.shutoff:            # case the --shutoff argument has been provided
                         quit_func(quit_script = True) # the script is terminated and, depending on Cubotino_P_bash.sh, it might shut the RPI off
-                    else:                             # case the --shutoff argument has not been provided
-                        automated = False             # automated variable is set false, robot waits for solve button commands
+                    else:                       # case the --shutoff argument has not been provided
+                        automated = False       # automated variable is set false, robot waits for solve button commands
                 
-                start_up(first_cycle = False)  # sets the initial variables, to use the camera in manual modeL
+                start_up(first_cycle = False)   # sets the initial variables, to use the camera in manual modeL

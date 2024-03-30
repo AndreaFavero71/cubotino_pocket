@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 14 March 2024
+#  Andrea Favero 29 March 2024
 #
 # This code relates to CUBOTino 2x2x2 (Pocket), a very small and simple Rubik's cube solver robot 3D printed.
 # CUBOTino_P is the autonomous version of the CUBOTino robot series, for the 2x2x2 Rubik's cube.
@@ -19,7 +19,6 @@
 
 import sys, glob, os.path, pathlib, json
 from getmac import get_mac_address           # library to get the device MAC ddress
-from get_macs_AF import get_macs_AF          # import the get_macs_AF function
 
 
 class Settings:
@@ -31,9 +30,9 @@ class Settings:
             Settings datatypes are parsed."""
         
         # mac address is used by myself (Andrea Favero), to upload the settings fitting my robot
-        self.macs_AF = get_macs_AF()                      # mac addresses of AF bots are retrieved
-        self.folder = pathlib.Path().resolve()            # active folder (should be home/pi/cubotino/src)  
-        self.eth_mac = get_mac_address().lower()          # mac address is retrieved
+        self.folder = pathlib.Path().resolve()            # active folder (should be home/pi/cubotino_pocket/src)
+        self.macs_AF = self.get_macs_AF(self.folder)      # mac addresses of AF bots are retrieved
+        self.eth_mac = get_mac_address().lower()          # mac address of the Pi board is retrieved
         
         self.check_local_settings()                       # checks whether local settings files exist
         
@@ -44,6 +43,20 @@ class Settings:
         self.servos_s = self.parse_servos_settings(servos_s) # converts servos settings to correct datatype
 
 
+
+    def get_macs_AF(self, folder):
+        """Returns a tuple with the mac adresses from a text file (macs_AF.txt)."""
+        
+        fname = os.path.join(folder,'macs_AF.txt')        # filename for the text file with listed the mac adrresses
+        macs_AF = []                                      # emppty list to store the mac addresses
+        if os.path.exists(fname):                         # case the servo_settings file exists
+            with open(fname, "r") as f:                   # file is opened in reading mode
+                macs = f.readlines()                      # text lines are retrieved
+                for mac in macs:                          # iteration over the lines
+                    macs_AF.append(mac.lower().strip())   # stripped lines contents are appended to the mac list
+        
+        # in case the file is missed the returned tuple is empty
+        return tuple(macs_AF)                             # list is converted to tuple and returned
 
 
 
@@ -351,6 +364,7 @@ class Settings:
         backup_fname = os.path.join(self.folder, fname)          # folder and file name for the settings backup
         with open(os.open(backup_fname, os.O_CREAT | os.O_WRONLY, 0o777), 'w') as f:  # settings_backup file is opened in writing mode
             f.write(json.dumps(data, indent=0))                  # content of the setting file is saved in another file, as backup
+            f.truncate()                       # truncates the file (prevents older characters at file-end, if new content is shorter)
 
 
 

@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 10 March 2024
+#  Andrea Favero 29 March 2024
 #
 # This script relates to CUBOTino Pocket, a small and simple solver robot for a 2x2x2 Rubik's cube
 # This specific script manages the display, and it's imported by Cubotino_P.py and Cubotino_P_servos.py
@@ -94,21 +94,24 @@ class Display:
 
 
 
-    def show_on_display(self, r1,r2,x1=20,y1=25,x2=20,y2=65,fs1=22,fs2=22):
-        """Shows text on two rows, with parameters to generalize this function; Parameters are
-            r1, r2: text for row1 and row2
-            x1, x2: x coordinate for text at row1 and row2
-            y1, y2: y coordinate for text at row1 and row2
-            fs1, fs2: font size for text at row1 and row2
+    def show_on_display(self, r1,r2,x1=20,y1=25,x2=20,y2=65,fs1=22,fs2=22,r3='',x3=20,y3=100,fs3=22):
+        """Shows text on three rows, with parameters to generalize this function; Parameters are
+            r1, r2, r3: text for row1, row2 and row3
+            x1, x2, x3: x coordinate for text at row1, row2 and row3
+            y1, y2, y3: y coordinate for text at row1, row2 and row3
+            fs1, fs2, fs3: font size for text at row1, row2 and row3
             """
         
         font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs1)  # font and size for first text row
         font2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs2)  # font and size for second text row
-        disp_img = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))                 # full black image
-        disp_draw = ImageDraw.Draw(disp_img)                                                     # image is drawned
-        disp_draw.text((x1, y1), r1, font=font1, fill=(255, 255, 255))    # first text row start coordinate, text, font, white color
-        disp_draw.text((x2, y2), r2, font=font2, fill=(255, 255, 255))    # second text row start coordinate, text, font, white color
-        self.disp.display(disp_img)                                       # image is plot to the display
+        disp_img = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))  # full black image
+        disp_draw = ImageDraw.Draw(disp_img)                               # image is drawned
+        disp_draw.text((x1, y1), r1, font=font1, fill=(255, 255, 255))     # first text row start coordinate, text, font, white color
+        disp_draw.text((x2, y2), r2, font=font2, fill=(255, 255, 255))     # second text row start coordinate, text, font, white color
+        if r3 != '':                                                       # case r3 differs from empty string
+            font3 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs3)  # font and size for third text row
+            disp_draw.text((x3, y3), r3, font=font3, fill=(255, 255, 255)) # third text row start coordinate, text, font, white color
+        self.disp.display(disp_img)                                        # image is plot to the display
 
 
 
